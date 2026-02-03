@@ -25,6 +25,7 @@ https://docs.python.org/3/library/concurrent.futures.html
 
 import concurrent.futures as cf
 import numpy as np
+import threading
 
 # Not strictly necessary, but the requests.Session object lets us do
 # still like keep Cookie state, or re-use TCP connections for
@@ -33,7 +34,7 @@ session = requests.Session()
 
 # Here's an example database update.
 def update_db(args):
-    print('Starting db update:', args)
+    print('Starting db update:', args, 'in thread', threading.current_thread().name)
     time.sleep(1)
     # maybe it fails?
     if np.random.uniform() < 0.25:
@@ -42,7 +43,7 @@ def update_db(args):
 
 # Here's an example callback using REST
 def fetch_http(args):
-    print('Making http request for', args)
+    print('Making http request for', args, 'in thread', threading.current_thread().name)
     r = session.get('http://httpbin.org/get?event=%i' % args)
     time.sleep(1)
     # maybe it fails?
@@ -53,17 +54,13 @@ def fetch_http(args):
     return r
 
 # We'll call this function (eg, in the actor code) to queue an
-# intensity-data callback.
-def do_http_callback(q, args, on_success, on_failure):
+# intensity-data callback.  This will call the "fetch_http" method
+# in a worker thread.
+def do_http_callback(q, args):
     '''
       q: our work queue
-      on_success: function to call upon successful completion:
-         gets passed (args, result)
-      on_failure: function to call upon failure (exception)
-         gets passed (args, exception)
-
     '''
-    q.put((fetch_http, args, on_success, on_failure))
+    q.put((fetch_http, args))
 
 # This is a little wrapper function needed below...
 def read_queue(q):
@@ -71,6 +68,7 @@ def read_queue(q):
 
 # The event-managing / queue-handling loop
 def manage_events(q, executor):
+    print('Managing events in thread', threading.current_thread().name)
     # The requests that we're waiting on...
     futures = {}
     q_future = None
@@ -86,7 +84,6 @@ def manage_events(q, executor):
                                 timeout=None,
                                 return_when=cf.FIRST_COMPLETED)
         # we get back the list of "done" and "not_done" events.
-
         for f in done:
             # New work arrived on the queue!
             if f is q_future:
@@ -103,42 +100,28 @@ def manage_events(q, executor):
                     break
 
                 # The event contains:
-                target, args, on_success, on_failure = event
+                target, args = event
                 # Submit the work...
                 f = executor.submit(target, args)
                 # Save the resulting "future"
-                futures[f] = (target, args, on_success, on_failure)
+                futures[f] = (target, args)
                 continue
 
             # A requested bit of work completed!
-            target, args, on_success, on_failure = futures[f]
-            success = False
-            exc = None
+            target, args = futures[f]
+            # ... do we really need to do anything??
             try:
                 # if there was an exception, it gets re-thrown now!
                 r = f.result()
-                success = True
             except Exception as e:
-                r = None
-                exc = e
-            if success:
-                if on_success is not None:
-                    on_success(args, r)
-            else:
-                if on_failure is not None:
-                    on_failure(args, exc)
+                print('An exception was thrown while processing an asynchronous request:',
+                      target, args, e)
+
             del futures[f]
 
         if quit_now:
             break
     print('manage_events returning')
-
-# example callbacks
-def http_completed(args, result):
-    print('callback http_completed:', args, result)
-
-def http_failed(args, exc):
-    print('callback http_failed:', args, exc)
 
 def main():
     executor = cf.ThreadPoolExecutor(max_workers=100)
@@ -150,12 +133,8 @@ def main():
 
     
     for i in range(1, 11):
-        do_http_callback(q, (i,), http_completed, http_failed)
-    # q.put(42)
-    # time.sleep(3)
-    # q.put(52)
-    # q.put(62)
-    # 
+        do_http_callback(q, (i,))
+
     time.sleep(10)
 
     print('Shutdown')
