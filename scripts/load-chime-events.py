@@ -9,6 +9,7 @@ import fitsio
 from copy import deepcopy
 
 from frb_common.events.l1_event.dtypes import L1_EVENT_DTYPE
+import cfbm
 
 from chord_frb_db.utils import get_db_engine
 
@@ -351,16 +352,22 @@ def simple_create_pipeline():
 
     from chord_frb_sifter.actors.beam_buffer import BeamBuffer
     from chord_frb_sifter.actors.beam_grouper import BeamGrouper
+    from chord_frb_sifter.actors.localizer import Localizer
     from chord_frb_sifter.actors.simple_localizer import SimpleLocalizer
+    from chord_frb_sifter.actors.bright_pulsar_sifter import BrightPulsarSifter
+    from chord_frb_sifter.actors.rfi_sifter import RFISifter
+    from chord_frb_sifter.actors.dm_checker import DMChecker
 
     pipeline = []
     for name,clz in [('BeamBuffer', BeamBuffer),
                      ('BeamGrouper', BeamGrouper),
                      # ('EventMaker', EventMaker),
-                     # ('RFISifter', RFISifter),
-                     ('Localizer', SimpleLocalizer),
+                     ('RFISifter', RFISifter),
+                     ("BrightPulsarSifter", BrightPulsarSifter),
+                     ('Localizer', Localizer), # Gauss2D localizer
+                     #('Localizer', SimpleLocalizer), # S/N weighted
                      # ('KnownSourceSifter', KnownSourceSifter),
-                     # ('DMChecker', DMChecker),
+                     ('DMChecker', DMChecker),
                      # ('FluxEstimator', FluxEstimator),
                      # ('ActionPicker', ActionPicker),
                      ]:
@@ -376,7 +383,7 @@ def simple_create_pipeline():
 
 #def simple_process_events(pipeline, fpga, beam, events):
 def simple_process_events(pipeline, events):
-    #print('events:', type(events), events)
+    print('events:', type(events), events)
 
     input_events = [events]
     output_events = []
@@ -492,6 +499,8 @@ def simple_process_events_file(engine, pipeline, fn,
             for e in beam_events:
                 e['beam_dra'] = dr
                 e['beam_ddec'] = dd
+            for e in beam_events:
+                e['is_incoherent'] = False
 
             #print('beam_events:', beam_events)
 
@@ -549,7 +558,7 @@ if __name__ == '__main__':
 
     
     from frb_common import pipeline_tools
-    from frb_L2_L3.actors.localizer import Localizer
+    #from frb_L2_L3.actors.localizer import Localizer
 
     import importlib.resources
     # all pipeline behaviour is encoded in config file
@@ -579,8 +588,6 @@ if __name__ == '__main__':
         # from frb_L2_L3.actors.localizer import lookup
         
         sys.exit(0)
-    
-    
     
     from sqlalchemy import create_engine
     from sqlalchemy.orm import Session
@@ -649,7 +656,13 @@ if __name__ == '__main__':
     beams = np.hstack([np.arange(256) + i*1000 for i in range(4)])
     dra,ddec = chime_beam_numbers_to_dra_ddec(beams)
     beam_to_dradec = dict([(k,(v1,v2)) for k,v1,v2 in zip(beams, dra, ddec)])
-    xg,yg = chime_beam_numbers_to_sky_grid(beams)
+    #xg,yg = chime_beam_numbers_to_sky_grid(beams)
+
+    bm = cfbm.current_model_class()
+    xg, yg = bm.get_cartesian_from_position(
+        *bm.get_beam_positions(beams,freqs=bm.clamp_freq).squeeze().T
+        )
+    
     beam_to_xygrid = dict([(k,(v1,v2)) for k,v1,v2 in zip(beams, xg, yg)])
 
     for file_num in range(3):

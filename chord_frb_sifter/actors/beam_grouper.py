@@ -21,6 +21,7 @@ import msgpack
 #from frb_common.events import L1Event
 
 from chord_frb_sifter.actors.actor import Actor
+from chord_frb_sifter.event import L1Event, L2Event
 
 __author__ = "CHIME FRB Group"
 __developers__ = "Alex Josephy"
@@ -29,6 +30,7 @@ __email__ = "alexander.josephy@mail.mcgill.ca"
 # This incorporates steps that used to be in the EventMaker actor.
 def create_l2_event(l1_events, **kwargs):
     print('Creating L2 event from L1 events:')
+    print("l1_events type:",type(l1_events),type(l1_events[0]))
     for e in l1_events:
         print('  ', e)
     from collections import Counter
@@ -56,13 +58,15 @@ def create_l2_event(l1_events, **kwargs):
             best_event = e
     l1_events = keep
     # FIXME - this is silly
-    l2_event = best_event.copy()
+    l2_event = L2Event(best_event) # assuming best L1 event is a dictionary
     for k in ['beam_grid_x', 'beam_grid_y', 'beam_dra', 'beam_ddec', 'snr']:
         l2_event['max_' + k] = best_event[k]
         del l2_event[k]
     #
     l2_event.update(kwargs)
-    l2_event['l1_events'] = l1_events
+    
+    # Now that things are grouped and number of L1 events is fixed, cast as L1Event recarray
+    l2_event['l1_events'] = L1Event(l1_events) 
     return l2_event
 
 class BeamGrouper(Actor):
@@ -139,6 +143,7 @@ class BeamGrouper(Actor):
         print('First event:', events[0])
         groups = self._cluster(events)
 
+        dead_beams = [] # Needed for CHIME RFISifter, will probably want for CHORD, but likely won't come from L1 per event.
         beam_activity = len(set([e['beam'] for e in events]))
         dm_activity = len(set([e['dm'] for e in events]))
         avg_l1_grade = np.mean([e['rfi_grade_level1'] for e in events])
@@ -164,6 +169,7 @@ class BeamGrouper(Actor):
                                        beam_activity_lookback=self.beam_activity_lookback,
                                        dm_activity_lookback=self.dm_activity_lookback,
                                        avg_l1_grade=avg_l1_grade,
+                                       dead_beams=dead_beams,
                                        )
             l2_events.append(l2_event)
         return l2_events
@@ -181,7 +187,7 @@ class BeamGrouper(Actor):
         tdmxy /= self.thresholds
 
         tree = cKDTree(tdmxy)
-        neighbors = tree.query_ball_tree(tree, r=1.0, p=np.infty)
+        neighbors = tree.query_ball_tree(tree, r=1.0, p=np.inf)
 
         groups = {}
         visiting = []

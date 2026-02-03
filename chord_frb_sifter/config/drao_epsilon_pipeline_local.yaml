@@ -56,8 +56,9 @@ specifics:
         # Grouping thresholds. Note: DEC. and R.A. thresholds are given in
         # units of beam separation, so thresholds of 1.1 will allow beams to be
         # grouped with the 8 (or 5) surrounding beams.
-        dec_thr: 2.1        # float; (see above note)
-        ra_thr: 3.1         # float; (see above note)
+        # CHORD-version change: in units of sin(beam angle) instead of beam number.
+        dec_thr: 0.021641410894400276 # float; (see above note)
+        ra_thr: 0.014208229280838603 # float; (see above note)
         t_thr: 64.          # float; time threshold in ms
         dm_thr: 3.5         # float; DM threshold in pc cm^-3
 

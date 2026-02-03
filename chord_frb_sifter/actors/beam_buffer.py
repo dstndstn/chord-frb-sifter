@@ -82,8 +82,9 @@ class BeamBuffer(Actor):
 
         def _append_events(lst, evts):
             for e in evts:
-                if not e.get('null_event', False):
-                    lst.append(e)
+                #if not e.get('null_event', False):
+                #    lst.append(e)
+                lst.append(e)
 
         for chunk, beam, events in event_sets:
             if chunk == self.previous_chunk:
