@@ -13,10 +13,10 @@ Restart=always
 KillSignal=SIGQUIT
 Type=forking
 NotifyAccess=all
-WorkingDirectory=/home/dstn/chord/chord-frb-db
+WorkingDirectory=/home/dstn/chord/chord-frb-sifter
 User=dstn
 #Environment="PYTHONPATH=/home/nova" "PATH=/usr/local/bin:"
-ExecStart=/home/dstn/chord/chord-frb-db/chord_frb_web/uwsgi.sh
+ExecStart=/home/dstn/chord/chord-frb-sifter/chord_frb_web/uwsgi.sh
 
 [Install]
 WantedBy=multi-user.target
