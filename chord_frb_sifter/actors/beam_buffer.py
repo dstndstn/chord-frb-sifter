@@ -8,7 +8,7 @@ from datetime import datetime
 
 import numpy as np
 
-from chord_frb_sifter.actors.actor import Actor
+from chord_frb_sifter.actors import Actor
 
 class BeamBuffer(Actor):
     """

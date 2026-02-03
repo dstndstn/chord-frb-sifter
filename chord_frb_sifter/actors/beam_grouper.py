@@ -15,7 +15,7 @@ from collections import deque
 import numpy as np
 from scipy.spatial import cKDTree
 
-from chord_frb_sifter.actors.actor import Actor
+from chord_frb_sifter.actors import Actor
 from chord_frb_sifter.event import L1Event, L2Event
 
 __author__ = "CHIME FRB Group"

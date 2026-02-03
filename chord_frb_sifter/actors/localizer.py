@@ -9,7 +9,7 @@ from scipy.optimize import least_squares
 import cfbm
 from datetime import datetime
 
-from chord_frb_sifter.actors.actor import Actor
+from chord_frb_sifter.actors import Actor
 
 class Localizer(Actor):
     """
