@@ -57,16 +57,18 @@ def fetch_http(args):
 
 # We'll call this function (eg, in the actor code) to queue an
 # intensity-data callback.  This will call the "fetch_http" method
-# in a worker thread.
+# in a worker thread with the given args.
 def do_http_callback(exe, args):
     '''
-      exe: async executor
+    exe: async executor
     '''
     exe.submit(fetch_http, args)
 
+# Called from the actor code to fire off a database update,
+# by calling update_db with the given args, in a worker thread.
 def do_db_update(exe, args):
     '''
-      exe: async executor
+    exe: async executor
     '''
     exe.submit(update_db, args)
 
