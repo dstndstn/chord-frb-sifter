@@ -49,6 +49,7 @@ def fetch_http(args):
     # maybe it fails?
     u = np.random.uniform()
     if u < 0.25:
+        print('Http request failed for', args)
         raise RuntimeError('HTTP request failed')
     print('Http request finished for', args)
     return r
@@ -56,92 +57,22 @@ def fetch_http(args):
 # We'll call this function (eg, in the actor code) to queue an
 # intensity-data callback.  This will call the "fetch_http" method
 # in a worker thread.
-def do_http_callback(q, args):
+def do_http_callback(exe, args):
     '''
-      q: our work queue
+      exe: async executor
     '''
-    q.put((fetch_http, args))
-
-# This is a little wrapper function needed below...
-def read_queue(q):
-    return q.get()
-
-# The event-managing / queue-handling loop
-def manage_events(q, executor):
-    print('Managing events in thread', threading.current_thread().name)
-    # The requests that we're waiting on...
-    futures = {}
-    q_future = None
-    quit_now = False
-    while True:
-        # We want to wait on either new work arriving on the queue, or
-        # a job completing.
-        # "q_future" represents new work arriving on the queue.
-        if q_future is None:
-            q_future = executor.submit(read_queue, q)
-        # Now we wait for the event to happen:
-        done,not_done = cf.wait([q_future] + list(futures.keys()),
-                                timeout=None,
-                                return_when=cf.FIRST_COMPLETED)
-        # we get back the list of "done" and "not_done" events.
-        for f in done:
-            # New work arrived on the queue!
-            if f is q_future:
-                event = f.result()
-                print('Got event from queue:', event)
-                # reset our queue-waiting object
-                q_future = None
-
-                # A special "None" event means "quit now".
-                # presumably we would also want a "wrap everything up cleanly and quit"...
-                if event is None:
-                    # cancel futures?
-                    quit_now = True
-                    break
-
-                # The event contains:
-                target, args = event
-                # Submit the work...
-                f = executor.submit(target, args)
-                # Save the resulting "future"
-                futures[f] = (target, args)
-                continue
-
-            # A requested bit of work completed!
-            target, args = futures[f]
-            # ... do we really need to do anything??
-            try:
-                # if there was an exception, it gets re-thrown now!
-                r = f.result()
-            except Exception as e:
-                print('An exception was thrown while processing an asynchronous request:',
-                      target, args, e)
-
-            del futures[f]
-
-        if quit_now:
-            break
-    print('manage_events returning')
+    exe.submit(fetch_http, args)
 
 def main():
     executor = cf.ThreadPoolExecutor(max_workers=100)
 
-    q = SimpleQueue()
-    #t = Thread(target=run_slow_v1, args=(q,), daemon=True)
-    t = Thread(target=manage_events, args=(q, executor), daemon=True)
-    t.start()
-
-    
     for i in range(1, 11):
-        do_http_callback(q, (i,))
+        do_http_callback(executor, (i,))
 
-    time.sleep(10)
+    time.sleep(5)
 
     print('Shutdown')
-    #executor.shutdown(wait=False, cancel_futures=True)
-    q.put(None)
     executor.shutdown(wait=True)
-    t.join()
 
 if __name__ == '__main__':
     main()
