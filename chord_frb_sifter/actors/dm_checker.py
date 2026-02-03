@@ -8,7 +8,7 @@ import os
 import numpy as np
 from scipy.interpolate import LinearNDInterpolator
 
-from chord_frb_sifter.actors.actor import Actor
+from chord_frb_sifter.actors import Actor
 
 class DMChecker(Actor):
     """

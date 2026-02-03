@@ -1,6 +1,6 @@
 import numpy as np
 
-from chord_frb_sifter.actors.actor import Actor
+from chord_frb_sifter.actors import Actor
 
 def radec_to_xyz(ra, dec):
     decrad = np.deg2rad(dec)

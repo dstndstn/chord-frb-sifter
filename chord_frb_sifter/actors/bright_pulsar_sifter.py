@@ -4,7 +4,7 @@ a wide window in HA based on when we expect to detect known bright pulsars in
 sidelobes.
 """
 
-from chord_frb_sifter.actors.actor import Actor
+from chord_frb_sifter.actors import Actor
 from chord_frb_sifter.chord import Chord
 
 import numpy as np
