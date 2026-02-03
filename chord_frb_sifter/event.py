@@ -66,7 +66,7 @@ def get_L1Event_dtype():
         ("beam_ddec", np.float32),
         ("pipeline_timestamp", np.float32),
         ("pipeline_id", np.uint64),
-        ("is_incoherent", np.bool),
+        ("is_incoherent", bool),
     ])
 
     return l1_dtype
