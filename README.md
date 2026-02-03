@@ -51,6 +51,18 @@ core functionality directly rather than using the (perhaps overly)
 elaborate framework used in CHIME/FRB.
 
 
+## Setup / initialization:
+
+```
+# Install CHIME/FRB beam model
+python -m pip instal cfbm
+# Get data for cfbm
+python -c "from cfbm.bm_data import get_data; get_data()"
+
+# Install other packages required
+python -m pip install threadpoolctl
+```
+
 ## Scripts
 
 * load-chime-events.py

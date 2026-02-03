@@ -14,11 +14,6 @@ from collections import deque
 
 import numpy as np
 from scipy.spatial import cKDTree
-import msgpack
-
-#from frb_common import ActorBaseClass
-#from frb_common import configuration_manager as cm
-#from frb_common.events import L1Event
 
 from chord_frb_sifter.actors.actor import Actor
 from chord_frb_sifter.event import L1Event, L2Event

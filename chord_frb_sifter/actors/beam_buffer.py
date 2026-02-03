@@ -2,15 +2,11 @@
 This is a CHORD/FRB prototype version, modified from CHIME/FRB.
 This actor buffers input from L1, gathering all events from a given time-chunk of data.
 """
-
-from os import path
+import time
 import traceback
 from datetime import datetime
 
 import numpy as np
-import msgpack
-
-import time
 
 from chord_frb_sifter.actors.actor import Actor
 

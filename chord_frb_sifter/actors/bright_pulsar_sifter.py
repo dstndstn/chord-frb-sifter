@@ -5,6 +5,8 @@ sidelobes.
 """
 
 from chord_frb_sifter.actors.actor import Actor
+from chord_frb_sifter.chord import Chord
+
 import numpy as np
 from datetime import datetime
 
@@ -13,7 +15,6 @@ from datetime import datetime
 # Imports for astropy LST calculation
 from astropy.time import Time
 from astropy.coordinates import EarthLocation
-from chord import Chord
 import yaml
 import os.path
 

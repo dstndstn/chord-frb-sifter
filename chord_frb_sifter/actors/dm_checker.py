@@ -4,13 +4,11 @@ and YMW2016 electron-density models.
 
 Based on CHIME's dm_checker module, but simpilfied.
 """
-
-from scipy.interpolate import LinearNDInterpolator
+import os
 import numpy as np
+from scipy.interpolate import LinearNDInterpolator
 
 from chord_frb_sifter.actors.actor import Actor
-from frb_L2_L3 import config_dir # will want to replace with CHORD data dir later.
-
 
 class DMChecker(Actor):
     """
@@ -59,7 +57,7 @@ class DMChecker(Actor):
         **kwargs
     ):
 
-        super(DMChecker, self).__init__(**kwargs)
+        super().__init__(**kwargs)
 
         # store configuration parameters.
         self.systematic_uncertainty_limit = systematic_uncertainty_limit
@@ -68,10 +66,11 @@ class DMChecker(Actor):
         self.use_measured_uncertainty = use_measured_uncertainty
 
         # load maps and set up interpolators.
-        map_YMW16 = np.load(config_dir + "/data/dm_checker/YMW16_map.npy").T
-        map_NE2001 = np.load(config_dir + "/data/dm_checker/NE2001_map.npy").T
-
-        self.interp_map_ymw16 = LinearNDInterpolator(map_YMW16[:2].T, map_YMW16[2].T)
+        import chord_frb_sifter
+        config_dir = os.path.join(os.path.dirname(chord_frb_sifter.__file__), 'data', 'dm_checker')
+        map_YMW16  = np.load(os.path.join(config_dir, 'YMW16_map.npy' )).T
+        map_NE2001 = np.load(os.path.join(config_dir, 'NE2001_map.npy')).T
+        self.interp_map_ymw16  = LinearNDInterpolator(map_YMW16 [:2].T, map_YMW16 [2].T)
         self.interp_map_ne2001 = LinearNDInterpolator(map_NE2001[:2].T, map_NE2001[2].T)
 
     def _perform_action(self, event):
