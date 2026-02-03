@@ -95,6 +95,19 @@ class L2Event(dict):
 
     _reserved = set(dir(dict))
 
+    def is_rfi(self):
+        return getattr(self, 'is_rfi', False)
+
+    def is_known_source(self):
+        return getattr(self, 'is_known_source', False)
+
+    def set_frb(self):
+        self.is_frb = True
+    def set_ambiguous(self):
+        self.is_ambiguous = True
+    def set_galactic(self):
+        self.is_galactic = True
+
     def __getattr__(self, name):
         if name in self._reserved:
             return super().__getattribute__(name)

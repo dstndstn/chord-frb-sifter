@@ -70,6 +70,8 @@ class DMChecker(Actor):
         config_dir = os.path.join(os.path.dirname(chord_frb_sifter.__file__), 'data', 'dm_checker')
         map_YMW16  = np.load(os.path.join(config_dir, 'YMW16_map.npy' )).T
         map_NE2001 = np.load(os.path.join(config_dir, 'NE2001_map.npy')).T
+        # These files are N x 4 arrays, [RA, Dec, DM, something]
+        # with RA,Dec in degrees.
         self.interp_map_ymw16  = LinearNDInterpolator(map_YMW16 [:2].T, map_YMW16 [2].T)
         self.interp_map_ne2001 = LinearNDInterpolator(map_NE2001[:2].T, map_NE2001[2].T)
 
@@ -80,22 +82,16 @@ class DMChecker(Actor):
         """
 
         # RFI or known source -- don't perform DM check.
-        if (
-            (hasattr(event,"is_rfi") and event.is_rfi)
-            or (hasattr(event,"is_known_source") and event.is_known_source)
-        ):
+        if event.is_rfi() or event.is_known_source():
             return [event]
 
-        # convert copy of input RA/DEC to Galactic coordinates.
-        right_ascension = event.ra
-        declination = event.dec
         dm_measured = event.dm
         dm_uncertainty = event.dm_error
 
-        print("Performing action: obtain predicted DMs from maps...")
+        print('Looking up predicted DMs from maps...')
 
-        dm_ymw16 = self.interp_map_ymw16(right_ascension, declination)[0]
-        dm_ne2001 = self.interp_map_ne2001(right_ascension, declination)[0]
+        dm_ymw16  = self.interp_map_ymw16 (event.ra, event.dec)[0]
+        dm_ne2001 = self.interp_map_ne2001(event.ra, event.dec)[0]
 
         dm_pred = np.array([dm_ne2001, dm_ymw16])
         dm_systematic_error = np.fabs(dm_pred[1] - dm_pred[0])
@@ -108,22 +104,18 @@ class DMChecker(Actor):
             dm_uncertainty = 0.0
 
         # finally, compare with threshold and return boolean.
-        dm_diff = (dm_measured - dm_pred) / np.sqrt(
-            dm_uncertainty ** 2 + dm_systematic_error ** 2
-        )
+        dm_diff = (dm_measured - dm_pred) / np.hypot(dm_uncertainty, dm_systematic_error)
         
-        # update 'unknown_event_type' attribute in L2/L3 header.
-        if all(dm_diff > self.frb_threshold): # extragalactic
-            event.unknown_event_type = 1  # FRB
+        # classify into galactic / ambiguous / extragalactic = FRB
+        if all(dm_diff > self.frb_threshold):
+            event.set_frb()
+
+        elif (any(dm_diff <  self.frb_threshold) and
+              all(dm_diff >= self.ambiguous_threshold)):
+            event.set_ambiguous()
 
         else:
-            if any(dm_diff < self.frb_threshold) and all(
-                dm_diff >= self.ambiguous_threshold
-            ):
-                event.unknown_event_type = 2  # ambiguous
-
-            else:
-                event.unknown_event_type = 0  # Galactic
+            event.set_galactic()
 
         # update 'max_dm' attribute in accordance with configured DM model.
         event.dm_gal_ymw_2016_max = dm_ymw16
