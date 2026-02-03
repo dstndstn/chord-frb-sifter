@@ -38,6 +38,7 @@ def update_db(args):
     time.sleep(1)
     # maybe it fails?
     if np.random.uniform() < 0.25:
+        print('DB update failed for', args)
         raise RuntimeError("Databases, man, you just can't count on them")
     print('Updated db:', args)
 
@@ -63,16 +64,24 @@ def do_http_callback(exe, args):
     '''
     exe.submit(fetch_http, args)
 
+def do_db_update(exe, args):
+    '''
+      exe: async executor
+    '''
+    exe.submit(update_db, args)
+
 def main():
-    executor = cf.ThreadPoolExecutor(max_workers=100)
+    executor = cf.ThreadPoolExecutor(max_workers=3)
 
     for i in range(1, 11):
         do_http_callback(executor, (i,))
-
+    for i in range(1, 5):
+        do_db_update(executor, (i,))
     time.sleep(5)
 
-    print('Shutdown')
+    print('Shutdown starting')
     executor.shutdown(wait=True)
+    print('Shutdown finished')
 
 if __name__ == '__main__':
     main()
