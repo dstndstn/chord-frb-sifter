@@ -136,6 +136,9 @@ class KnownSource(Base):
     s1400_error: Mapped[Optional[float]] = mapped_column(REAL)
     events: Mapped[List['Event']] = relationship(back_populates='known')
 
+    def __str__(self):
+        return ('KnownSource: %s, %s, RA,Dec %.4f,%.4f, DM %.2f' %
+                (self.name, self.source_type, self.ra, self.dec, self.dm))
 class DumbTest(Base):
     __tablename__ = 'dumb_test'
     id:   Mapped[int] = mapped_column(primary_key=True)
