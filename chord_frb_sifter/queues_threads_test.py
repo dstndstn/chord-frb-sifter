@@ -21,6 +21,13 @@ pretty soon you have reinvented an async processing library...
 
 https://docs.python.org/3/library/concurrent.futures.html
 
+(But tbh, here we're not even saving/using the Future return type, so
+we could actually just fire off a new Thread for each request.  This
+has the advantage of using a pool of threads, so you can limit the
+number of concurrent requests; and if we wanted to track all the
+outstanding requests, that would be simple.  So using CF is probably
+worthwhile for giving ourselves a bit of expansion capability.)
+
 '''
 
 import concurrent.futures as cf
