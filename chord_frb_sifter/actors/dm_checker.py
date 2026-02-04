@@ -90,8 +90,8 @@ class DMChecker(Actor):
 
         print('Looking up predicted DMs from maps...')
 
-        dm_ymw16  = self.interp_map_ymw16 (event.ra, event.dec)[0]
-        dm_ne2001 = self.interp_map_ne2001(event.ra, event.dec)[0]
+        dm_ymw16  = float(self.interp_map_ymw16 (event.ra, event.dec))
+        dm_ne2001 = float(self.interp_map_ne2001(event.ra, event.dec))
 
         dm_pred = np.array([dm_ne2001, dm_ymw16])
         dm_systematic_error = np.fabs(dm_pred[1] - dm_pred[0])

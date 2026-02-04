@@ -30,7 +30,11 @@
       {% for field in fields %}
       <td>
 	{% if field in ['total_snr', 'dm', 'dm_ne2001', 'dm_ymw2016'] %}
+	{% if event[field] %}
 	{{ event[field]|round(2) }}
+	{% else %}
+	{{ event[field] }}
+	{% endif %}
 	{% elif field == 'nbeams' %}
 	  <a href="{{ url_for('l1_event_list', event_id=event['event_id']) }}">{{ event[field] }}</a>
 	{% else %}

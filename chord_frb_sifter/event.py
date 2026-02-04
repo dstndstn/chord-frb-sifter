@@ -51,6 +51,7 @@ def get_L1Event_dtype():
         ("snr", np.float32),
         ("snr_scale", np.float32),
         ("dm", np.float32),
+        ("dm_error", np.float32),
         ("spectral_index", np.uint8),
         ("scattering_measure", np.uint8),
         ("level1_nhits", np.uint16),
@@ -96,17 +97,21 @@ class L2Event(dict):
     _reserved = set(dir(dict))
 
     def is_rfi(self):
-        return getattr(self, 'is_rfi', False)
-
+        return getattr(self, 'flag_rfi', False)
+    def is_frb(self):
+        return getattr(self, 'flag_frb', False)
     def is_known_source(self):
-        return getattr(self, 'is_known_source', False)
+        return getattr(self, 'flag_known_source', False)
 
     def set_frb(self):
-        self.is_frb = True
+        self.flag_frb = True
     def set_ambiguous(self):
-        self.is_ambiguous = True
+        self.flag_ambiguous = True
     def set_galactic(self):
-        self.is_galactic = True
+        self.flag_galactic = True
+
+    def database_payload(self):
+        return self
 
     def __getattr__(self, name):
         if name in self._reserved:

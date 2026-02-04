@@ -61,7 +61,8 @@ def create_l2_event(l1_events, **kwargs):
     l2_event.update(kwargs)
     
     # Now that things are grouped and number of L1 events is fixed, cast as L1Event recarray
-    l2_event['l1_events'] = L1Event(l1_events) 
+    l2_event['l1_events'] = L1Event(l1_events)
+    print('l2 event:', l2_event)
     return l2_event
 
 class BeamGrouper(Actor):
