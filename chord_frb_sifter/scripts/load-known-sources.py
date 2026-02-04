@@ -15,7 +15,7 @@ but I had to modify it to generate values and errors in separate columns;
 https://github.com/dstndstn/rratalog/tree/csv-errors
 
 '''
-
+import os
 from chord_frb_db.models import KnownSource
 from chord_frb_db.utils import get_db_engine
 from sqlalchemy.orm import Session
@@ -42,8 +42,8 @@ def dmsstring2dec(s, sep=':'):
     s = float(words[2]) if len(words) == 3 else 0
     return sign * (d + m/60. + s/3600.)
 
-def ingest_rratalog(session):
-    lines = open('rratalog2.csv').readlines()
+def ingest_rratalog(session, filename):
+    lines = open(filename).readlines()
     # 1 line of header
     header = lines[0]
     lines = lines[1:]
@@ -96,8 +96,8 @@ def ingest_rratalog(session):
         session.add(ks)
         session.flush()
 
-def ingest_psrcat(session):
-    lines = open('psrcat.html').readlines()
+def ingest_psrcat(session, filename):
+    lines = open(filename).readlines()
     i0 = lines.index('<pre>\n')
     i1 = lines.index('</pre>\n')
     lines = lines[i0+1 : i1]
@@ -162,9 +162,10 @@ def main():
         session.commit()
 
     # Load
+    dirname = os.path.dirname(__file__)
     with Session(engine) as session:
-        ingest_rratalog(session)
-        ingest_psrcat(session)
+        ingest_rratalog(session, os.path.join(dirname, 'rratalog2.csv'))
+        ingest_psrcat(session, os.path.join(dirname, 'psrcat.html'))
         session.commit()
 
     # dump to FITS
