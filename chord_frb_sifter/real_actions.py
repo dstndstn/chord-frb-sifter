@@ -2,6 +2,8 @@
 def version():
     return 44
 
+#bombcat
+
 class RealActionPicker(object):
     def __init__(self, state=None, old_object=None):
         print('RealActionPicker (version %s)' % version())
