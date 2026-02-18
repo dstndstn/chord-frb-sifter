@@ -360,10 +360,10 @@ def simple_process_events_file(database_engine, pipeline, fn,
             else:
                 print('Pipeline outputs:', len(outputs), 'events')
 
-            if len(outputs):
-                # transaction block -- automatic commit on exit
-                with Session(database_engine) as session:
-                    send_to_db(session, outputs)
+            # if len(outputs):
+            #     # transaction block -- automatic commit on exit
+            #     with Session(database_engine) as session:
+            #         send_to_db(session, outputs)
 
 # We dumped a bunch of CHIME/FRB events as FITS tables
 def simple_read_fits_events(fn):
@@ -494,11 +494,18 @@ if __name__ == '__main__':
     # Fire saved CHIME/FRB events into pipeline
     for file_num in range(3):
         fn = 'events/events-%03i.fits' % file_num
+        print('Processing events from file', fn)
 
         simple_process_events_file(database_engine, simple_pipeline, fn,
                                    beam_to_dradec=beam_to_dradec,
                                    beam_to_xygrid=beam_to_xygrid)
 
+    print('Shutting down pipeline...')
+    for actor in simple_pipeline:
+        actor.shutdown()
+    del simple_pipeline
+    print('exit')
+    sys.exit(0)
 
 '''
 A reminder of what is in the events we have saved in the FITS files -- ie, what we get from
