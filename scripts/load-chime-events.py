@@ -236,6 +236,8 @@ def simple_create_pipeline():
     from chord_frb_sifter.actors.bright_pulsar_sifter import BrightPulsarSifter
     from chord_frb_sifter.actors.rfi_sifter import RFISifter
     from chord_frb_sifter.actors.dm_checker import DMChecker
+    #from chord_frb_sifter.actors.known_source import KnownSourceSifter
+    from chord_frb_sifter.actors.actions import ActionPicker
 
     pipeline = []
     for name,clz in [('BeamBuffer', BeamBuffer),
@@ -245,10 +247,10 @@ def simple_create_pipeline():
                      ("BrightPulsarSifter", BrightPulsarSifter),
                      ('Localizer', Localizer), # Gauss2D localizer
                      #('Localizer', SimpleLocalizer), # S/N weighted
-                     # ('KnownSourceSifter', KnownSourceSifter),
+                     #('KnownSourceSifter', KnownSourceSifter),
                      ('DMChecker', DMChecker),
                      # ('FluxEstimator', FluxEstimator),
-                     # ('ActionPicker', ActionPicker),
+                     ('ActionPicker', ActionPicker),
                      ]:
         conf = pipeline_tools.get_worker_configuration(name)
         conf.pop('io')
