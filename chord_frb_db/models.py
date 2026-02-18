@@ -145,6 +145,14 @@ class DumbTest(Base):
     #id:   Mapped[int] = mapped_column(BigInteger, primary_key=True)
     x: Mapped[int]
 
+#class EventId(Base):
+#    id:
+from sqlalchemy.schema import Sequence
+
+event_id_sequence = Sequence('event_id_sequence', start=1, metadata=Base.metadata)
+def get_next_event_id(session):
+    return session.scalar(event_id_sequence)
+
 if __name__ == '__main__':
     import os
     from sqlalchemy import create_engine
@@ -154,10 +162,13 @@ if __name__ == '__main__':
     # db_url = db_url.replace('PASSWORD', db_pass)
 
     #db_url = "sqlite+pysqlite:///:memory:"
-    db_url = "sqlite+pysqlite:///db.sqlite3"
-    
-    engine = create_engine(db_url, echo=True)
 
+    #db_url = "sqlite+pysqlite:///db.sqlite3"
+    #engine = create_engine(db_url, echo=True)
+
+    from chord_frb_db.utils import get_db_engine
+    engine = get_db_engine()
+    
     Base.metadata.create_all(engine)
 
     from sqlalchemy.orm import Session
@@ -167,7 +178,14 @@ if __name__ == '__main__':
         session.flush()
         print('d id', d.id)
     
-        e = EventBeam(dm=42)
+        e = EventBeam(dm=42, beam=900, snr=20, timestamp_utc=1400000, timestamp_fpga=10000,
+                      time_error=0., tree_index=0, rfi_grade=0, rfi_mask_fraction=0.,
+                      rfi_clip_fraction=0., dm_error=0.1, ra=0., dec=0., ra_error=0., dec_error=0.)
         session.add(e)
         session.flush()
         print('e id', e.id)
+
+        #s = event_id_sequence()
+        #s = session.execute(event_id_sequence)
+        s = session.scalar(event_id_sequence)
+        print('s:', s)

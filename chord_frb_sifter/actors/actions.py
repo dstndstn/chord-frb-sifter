@@ -14,10 +14,10 @@ import numpy as np
 # Should the database stuff be in a separate actor?
 
 class ActionPicker(Actor):
-    def __init__(self, **kwargs):
+    def __init__(self, database_engine=None, **kwargs):
         super().__init__(**kwargs)
         self.db_queue = Queue()
-        self.db_thread = Thread(target=ActionPicker.run_db, args=(self,))
+        self.db_thread = Thread(target=ActionPicker.run_db, args=(self, database_engine))
         self.db_thread.start()
         #self.db_executor = cf.ThreadPoolExecutor(max_workers=3)
 
@@ -30,9 +30,8 @@ class ActionPicker(Actor):
         print('done shutdown of ActionPicker')
 
     # There's no real reason this needs to be a class method...
-    def run_db(self):
+    def run_db(self, database_engine):
         print('Starting database interaction thread.')
-        database_engine = get_db_engine()
         with Session(database_engine) as session:
             while True:
                 print('Waiting for event from db queue.  Approx size: %i' % self.db_queue.qsize())
@@ -73,15 +72,19 @@ class ActionPicker(Actor):
         # Log everything in db?
         self.save_to_db(event)
 
+        if event.is_frb():
+            self.send_intensity_callback(event)
         # if event.is_rfi():
         #     return event
         # 
         # if event.is_frb():
         #     pass
-        return event
+        return [event]
 
     def save_to_db(self, event):
         # FIXME -- put_nowait ? queue size? timeout?
         #print('Saving event to db:', event)
         self.db_queue.put(event)
     
+    def send_intensity_callback(self, event):
+        pass

@@ -225,7 +225,7 @@ def setup():
                 
 # These are our simplified CHORD pipeline actors.
 # A "pipeline" here is just a list of actors.
-def simple_create_pipeline():
+def simple_create_pipeline(database_engine):
     # Still reusing some of the config stuff... can probably simplify this too!!
     from frb_common import pipeline_tools
 
@@ -238,10 +238,12 @@ def simple_create_pipeline():
     from chord_frb_sifter.actors.dm_checker import DMChecker
     #from chord_frb_sifter.actors.known_source import KnownSourceSifter
     from chord_frb_sifter.actors.actions import ActionPicker
+    from chord_frb_sifter.actors.db_id_stamper import EventIdStamper
 
     pipeline = []
     for name,clz in [('BeamBuffer', BeamBuffer),
                      ('BeamGrouper', BeamGrouper),
+                     ('EventIdStamper', EventIdStamper),
                      # ('EventMaker', EventMaker),
                      ('RFISifter', RFISifter),
                      ("BrightPulsarSifter", BrightPulsarSifter),
@@ -258,6 +260,7 @@ def simple_create_pipeline():
         picl = conf.pop('use_pickle')
         conf.pop('timeout')
         conf.pop('periodic_update')
+        conf.update(database_engine=database_engine)
         p = clz(**conf)
         pipeline.append(p)
     return pipeline
@@ -478,7 +481,7 @@ if __name__ == '__main__':
         session.commit()
         sys.exit(0)
 
-    simple_pipeline = simple_create_pipeline()
+    simple_pipeline = simple_create_pipeline(database_engine)
 
     # Set up CHIME beam stuff
     beams = np.hstack([np.arange(256) + i*1000 for i in range(4)])
