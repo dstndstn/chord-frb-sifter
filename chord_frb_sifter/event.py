@@ -90,6 +90,57 @@ class L1Event(np.recarray):
             array = np.asarray(input_array,dtype=get_L1Event_dtype())
         return array.view(cls)
 
+    def database_payloads(self):
+        l1_name_map = {
+            'beam': True,
+            'beam_no': 'beam',
+            'snr': True,
+            'timestamp_fpga': True,
+            'timestamp_utc': True,
+            'time_error': True,
+            'tree_index': True,
+            'rfi_grade_level1': 'rfi_grade',
+            'rfi_mask_fraction': True,
+            'rfi_clip_fraction': True,
+            'dm': True,
+            'dm_error': True,
+            'pos_ra_deg': 'ra',
+            'pos_ra_error_deg': 'ra_error',
+            'pos_dec_deg': 'dec',
+            'pos_dec_error_deg': 'dec_error',
+        }
+
+        n = self.size
+        # Convert back to a list of dicts.
+        l1list = [{} for i in range(n)]
+        for col in self.dtype.names:
+            vals = self[col]
+            for i,val in enumerate(vals):
+                l1list[i][col] = val
+
+        l1_objs = []
+        for l1 in l1list:
+            l1_db_args = {}
+            for key,val in l1.items():
+                if key == 'timestamp_utc':
+                    # microsec -> sec
+                    val *= 1e-6
+                val = to_db_type(val)
+                k2 = l1_name_map.get(key, None)
+                if k2 is not None:
+                    # same key name
+                    if k2 is True:
+                        k2 = key
+                    l1_db_args[k2] = val
+
+            ## FIXME -- fake up some required fields!
+            for key in ['time_error', 'dm_error', 'ra', 'dec', 'ra_error', 'dec_error']:
+                if not key in l1_db_args:
+                    l1_db_args[key] = 0.
+
+            l1_objs.append(l1_db_args)
+        return l1_objs
+
 class L2Event(dict):
     __setattr__ = dict.__setitem__
     __delattr__ = dict.__delitem__
@@ -110,9 +161,6 @@ class L2Event(dict):
     def set_galactic(self):
         self.flag_galactic = True
 
-    def database_payload(self):
-        return self
-
     def __getattr__(self, name):
         if name in self._reserved:
             return super().__getattribute__(name)
@@ -125,3 +173,80 @@ class L2Event(dict):
         if name.startswith("_") or name in self._reserved:
             raise AttributeError(f"'{name}' is reserved")
         self[name] = value
+
+    def database_payload(self):
+        # dict shallow copy
+        #payload = self.copy()
+        l2_db_args = { 'is_rfi': self.is_rfi(),
+                       'is_known_pulsar': False,
+                       'is_new_burst': False,
+                       'is_frb': event.is_frb(),
+                       'is_repeating_frb': False,
+                       'scattering': 0.,
+                       'fluence': 0.,
+        }
+        l2_name_map = {
+            'timestamp_utc': 'timestamp',
+            'combined_snr': 'total_snr',
+            'dm': True,
+            'dm_error': True,
+            'ra': True,
+            'dec': True,
+            'is_rfi': True,
+            'is_frb': True,
+            'pos_ra_deg': 'ra',
+            'pos_error_semimajor_deg_68': 'ra_error',
+            'pos_dec_deg': 'dec',
+            'pos_error_semiminor_deg_68': 'dec_error',
+            'dm_gal_ne_2001_max': 'dm_ne2001',
+            'dm_gal_ymw_2016_max': 'dm_ymw2016',
+            'spectral_index': True,
+            'pulse_width_ms': 'pulse_width',
+            'rfi_grade_level2': 'rfi_grade',
+            'beam_activity': True,
+            'flux_mjy': 'flux',
+        }
+
+        n_l1 = 0
+        for k,v in self.items():
+            # skip...
+            if k in ['dead_beam_nos']:
+                continue
+            if k == 'l1_events':
+                n_l1 = len(v)
+                continue
+
+            # FIXME
+            if k == 'known_source_name':
+                if v != "":
+                    print('Known source!')
+                    print('val: "%s"' % v)
+
+            v = to_db_type(v)
+            if k == 'timestamp_utc':
+                # microseconds -> seconds
+                v *= 1e-6
+            if k == 'flux_mjy':
+                # milli -> Jansky
+                v *= 0.001
+
+            k2 = l2_name_map.get(k, None)
+            if k2 is not None:
+                # same key name
+                if k2 is True:
+                    k2 = k
+                l2_db_args[k2] = v
+            else:
+                print('Ignoring L2 key:', k, '=', v)
+
+        l2_db_args['nbeams'] = n_l1
+        return l2_db_args
+
+
+def to_db_type(v):
+    # convert to normal python types for database interaction
+    if isinstance(v, (np.float32, np.float64)):
+        v = float(v)
+    if isinstance(v, (np.uint64, np.uint16, np.uint8)):
+        v = int(v)
+    return v

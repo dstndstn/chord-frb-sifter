@@ -24,12 +24,12 @@ __email__ = "alexander.josephy@mail.mcgill.ca"
 
 # This incorporates steps that used to be in the EventMaker actor.
 def create_l2_event(l1_events, **kwargs):
-    print('Creating L2 event from L1 events:')
-    print("l1_events type:",type(l1_events),type(l1_events[0]))
-    for e in l1_events:
-        print('  ', e)
+    #print('Creating L2 event from L1 events:')
+    #print("l1_events type:",type(l1_events),type(l1_events[0]))
+    #for e in l1_events:
+    #    print('  ', e)
     from collections import Counter
-    print('Beam counts:', Counter([e['beam'] for e in l1_events]))
+    #print('Beam counts:', Counter([e['beam'] for e in l1_events]))
     #
     # Keep only the max-SNR event for each beam.
     beam_maxsnr = {}
@@ -62,7 +62,7 @@ def create_l2_event(l1_events, **kwargs):
     
     # Now that things are grouped and number of L1 events is fixed, cast as L1Event recarray
     l2_event['l1_events'] = L1Event(l1_events)
-    print('l2 event:', l2_event)
+    #print('l2 event:', l2_event)
     return l2_event
 
 class BeamGrouper(Actor):
