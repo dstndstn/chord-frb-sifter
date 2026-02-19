@@ -41,7 +41,7 @@ def get_L1Event_dtype():
 
     # These are fields that Dustin has in the list of dicts l1 events
     l1_dtype = np.dtype([
-        ("event_id", np.uint64),
+        ("id", np.uint64),
         ("beam", np.uint16),
         ("timestamp_utc", np.float64),
         ("timestamp_fpga", np.uint64),
@@ -93,6 +93,7 @@ class L1Event(np.recarray):
 
     def database_payloads(self):
         l1_name_map = {
+            'id': True,
             'beam': True,
             'beam_no': 'beam',
             'snr': True,
@@ -181,12 +182,13 @@ class L2Event(dict):
         l2_db_args = { 'is_rfi': self.is_rfi(),
                        'is_known_pulsar': False,
                        'is_new_burst': False,
-                       'is_frb': event.is_frb(),
+                       'is_frb': self.is_frb(),
                        'is_repeating_frb': False,
                        'scattering': 0.,
                        'fluence': 0.,
         }
         l2_name_map = {
+            'event_id': True,
             'timestamp_utc': 'timestamp',
             'combined_snr': 'total_snr',
             'dm': True,

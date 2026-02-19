@@ -16,12 +16,24 @@ class EventIdStamper(Actor):
         self.db_thread.start()
 
     def run_db(self, database_engine):
-        with Session(database_engine) as session:
+        print('database_engine:', database_engine)
+        if database_engine.is_sqlite:
+            # FAKE IT!
+            eid = 1
             while True:
-                eid = get_next_event_id(session)
                 self.event_id_queue.put(eid)
+                eid += 1
+        else:
+            with Session(database_engine) as session:
+                while True:
+                    eid = get_next_event_id(session)
+                    self.event_id_queue.put(eid)
 
     def _perform_action(self, event):
+        l1 = event['l1_events']
+        for i in range(len(l1)):
+            eid = self.event_id_queue.get()
+            l1['id'][i] = eid
         eid = self.event_id_queue.get()
         print('Stamped L2 event id', eid)
         event.event_id = eid

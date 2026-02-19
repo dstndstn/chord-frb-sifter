@@ -238,13 +238,12 @@ def simple_create_pipeline(database_engine):
     from chord_frb_sifter.actors.dm_checker import DMChecker
     #from chord_frb_sifter.actors.known_source import KnownSourceSifter
     from chord_frb_sifter.actors.actions import ActionPicker
-    from chord_frb_sifter.actors.db_id_stamper import EventIdStamper
+    from chord_frb_sifter.actors.event_id_stamper import EventIdStamper
 
     pipeline = []
     for name,clz in [('BeamBuffer', BeamBuffer),
                      ('BeamGrouper', BeamGrouper),
                      ('EventIdStamper', EventIdStamper),
-                     # ('EventMaker', EventMaker),
                      ('RFISifter', RFISifter),
                      ("BrightPulsarSifter", BrightPulsarSifter),
                      ('Localizer', Localizer), # Gauss2D localizer
@@ -507,7 +506,18 @@ if __name__ == '__main__':
     for actor in simple_pipeline:
         actor.shutdown()
     del simple_pipeline
-    print('exit')
+
+    with Session(database_engine) as session:
+        from sqlalchemy import select, func
+        mx = session.query(func.max(Event.event_id)).scalar()
+        print('Max event_id:', mx)
+        stmt = select(Event).where(Event.event_id == mx)
+        #print('Running statement:', stmt)
+        result = session.execute(stmt)
+        for r in result:
+            e, = r
+            print('Got:', e, 'with event_id', e.event_id)
+
     sys.exit(0)
 
 '''

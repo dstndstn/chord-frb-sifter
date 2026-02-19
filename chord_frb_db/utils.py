@@ -9,4 +9,5 @@ def get_db_engine():
     if 'sqlite' in db_url:
         # Make sure database tables exist
         Base.metadata.create_all(engine)
+    engine.is_sqlite = 'sqlite' in db_url
     return engine

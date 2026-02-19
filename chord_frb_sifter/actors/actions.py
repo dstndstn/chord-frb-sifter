@@ -56,17 +56,20 @@ class ActionPicker(Actor):
             session.flush()
             # Now we know the L1 event's unique id
             assert(db_obj.id is not None)
-            l1_db_obj.append(db_obj)
+            l1_db_objs.append(db_obj)
 
         # Save L2 event
         l2_payload = event.database_payload()
-        l2_db_obj = Event(**l2_db_args)
+        l2_db_obj = Event(**l2_payload)
         # Add L2 event to db
         session.add(l2_db_obj)
 
         # Now we can associate the L1 events with the L2 event.
         for e in l1_db_objs:
             l2_db_obj.beams.append(e)
+        # DEBUG
+        session.flush()
+        print('Saved L2 event id', l2_db_obj.event_id)
 
     def _perform_action(self, event):
         # Log everything in db?
