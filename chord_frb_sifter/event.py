@@ -153,6 +153,10 @@ class L2Event(dict):
         return getattr(self, 'flag_rfi', False)
     def is_frb(self):
         return getattr(self, 'flag_frb', False)
+    def is_galactic(self):
+        return getattr(self, 'flag_galactic', False)
+    def is_ambiguous(self):
+        return getattr(self, 'flag_ambiguous', False)
     def is_known_source(self):
         return getattr(self, 'flag_known_source', False)
 
@@ -240,7 +244,8 @@ class L2Event(dict):
                     k2 = k
                 l2_db_args[k2] = v
             else:
-                print('Ignoring L2 key:', k, '=', v)
+                pass
+                #print('Ignoring L2 key:', k, '=', v)
 
         l2_db_args['nbeams'] = n_l1
         return l2_db_args
