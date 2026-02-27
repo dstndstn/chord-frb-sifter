@@ -73,6 +73,28 @@ def get_L1Event_dtype():
 
     return l1_dtype
 
+def calculate_dm_error(tree_index):
+
+    # should load from config...
+    nds = [1, 2, 4, 8, 16]
+    nups = 1
+    dm_coarse_graining_factor = [16, 8, 8, 8, 8]
+    time_coarse_graining_factor = [16, 8, 8, 8, 8]
+    tree_size = [ 32768, 32768, 32768, 32768, 16384 ]
+    dt_sample = 0.00098304
+    freq_lo_MHz = 400.0
+    freq_hi_MHz = 800.0
+
+    itree = tree_index
+    tree_dt = dt_sample * nds[itree] / nups
+
+    tree_max_dm = (tree_size[itree] - 1) * tree_dt / (4.148806e3 * (1.0 / freq_lo_MHz ** 2 - 1.0 / freq_hi_MHz ** 2))
+    
+    return tree_max_dm * dm_coarse_graining_factor[itree] / tree_size[itree] / 2.0
+
+    # Could also do if we need it (but right now its not in L1Event dtype):
+    #self["time_error"] = tree_dt * dm_coarse_graining_factor[itree] / 2.0
+
 class L1Event(np.recarray):
     """
     A class representing an L1 event, inheriting from numpy recarray.
@@ -90,6 +112,7 @@ class L1Event(np.recarray):
             # May want to add other ways to create?
             array = np.asarray(input_array,dtype=get_L1Event_dtype())
         return array.view(cls)
+
 
     def database_payloads(self):
         l1_name_map = {

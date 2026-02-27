@@ -397,7 +397,7 @@ def simple_read_fits_events(fn):
         e['chunk_utc'] = e['frame0_nano']/1000. + e['chunk_fpga'] * 2.56
 
         # HACK -- fake a DM error.  We should get this from, bonsai config?
-        e['dm_error'] = 1.
+        #e['dm_error'] = 1.
 
     print('Event keys:', eventlist[0].keys())
     return fpgas,beams,eventlist

@@ -16,7 +16,7 @@ import numpy as np
 from scipy.spatial import cKDTree
 
 from chord_frb_sifter.actors import Actor
-from chord_frb_sifter.event import L1Event, L2Event
+from chord_frb_sifter.event import L1Event, L2Event, calculate_dm_error
 
 __author__ = "CHIME FRB Group"
 __developers__ = "Alex Josephy"
@@ -31,6 +31,9 @@ def create_l2_event(l1_events, **kwargs):
     from collections import Counter
     #print('Beam counts:', Counter([e['beam'] for e in l1_events]))
     #
+    # Calculate DM error from config. Where should this go?
+    for l1_event in l1_events:
+        l1_event["dm_error"] = calculate_dm_error(l1_event["tree_index"])    
     # Keep only the max-SNR event for each beam.
     beam_maxsnr = {}
     for e in l1_events:
