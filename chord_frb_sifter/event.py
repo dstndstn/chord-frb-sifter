@@ -10,12 +10,27 @@ class attributes.
 
 import numpy as np
 
+def load_bonsai_config(configfn = 'bonsai_production_fixed_coarse_graining_hybrid_0.8_0.015.txt'):
+    from pathlib import Path
+    from importlib.util import module_from_spec, spec_from_loader
+    from importlib.machinery import SourceFileLoader
+    
+    path = Path(__file__).parent / "config" / configfn
+
+    spec = spec_from_loader("bonsai_cfg", SourceFileLoader("bonsai_cfg", str(path)))
+    bonsai_cfg = module_from_spec(spec)
+    spec.loader.exec_module(bonsai_cfg)
+
+    return bonsai_cfg
+
+L1_config = load_bonsai_config()
+
 def get_L1Event_dtype():
 
     # Hardcoded for now to avoid loading CHIME bonsai config.
     # Will want to replace with CHORD config loading eventually.
-    nds = [1, 2, 4, 8, 16]
-    nbeta = 2
+    nds = L1_config.nds
+    nbeta = L1_config.nbeta
 
     # The dtype from the saved L1b triggers from fits files:
     #dtype([
@@ -52,7 +67,6 @@ def get_L1Event_dtype():
         ("snr", np.float32),
         ("snr_scale", np.float32),
         ("dm", np.float32),
-        ("dm_error", np.float32),
         ("spectral_index", np.uint8),
         ("scattering_measure", np.uint8),
         ("level1_nhits", np.uint16),
@@ -73,27 +87,6 @@ def get_L1Event_dtype():
 
     return l1_dtype
 
-def calculate_dm_error(tree_index):
-
-    # should load from config...
-    nds = [1, 2, 4, 8, 16]
-    nups = 1
-    dm_coarse_graining_factor = [16, 8, 8, 8, 8]
-    time_coarse_graining_factor = [16, 8, 8, 8, 8]
-    tree_size = [ 32768, 32768, 32768, 32768, 16384 ]
-    dt_sample = 0.00098304
-    freq_lo_MHz = 400.0
-    freq_hi_MHz = 800.0
-
-    itree = tree_index
-    tree_dt = dt_sample * nds[itree] / nups
-
-    tree_max_dm = (tree_size[itree] - 1) * tree_dt / (4.148806e3 * (1.0 / freq_lo_MHz ** 2 - 1.0 / freq_hi_MHz ** 2))
-    
-    return tree_max_dm * dm_coarse_graining_factor[itree] / tree_size[itree] / 2.0
-
-    # Could also do if we need it (but right now its not in L1Event dtype):
-    #self["time_error"] = tree_dt * dm_coarse_graining_factor[itree] / 2.0
 
 class L1Event(np.recarray):
     """
@@ -113,6 +106,35 @@ class L1Event(np.recarray):
             array = np.asarray(input_array,dtype=get_L1Event_dtype())
         return array.view(cls)
 
+    def get_dm_error(self):
+    
+        ## should load from config...
+        #nds = [1, 2, 4, 8, 16]
+        #nups = 1
+        #dm_coarse_graining_factor = [16, 8, 8, 8, 8]
+        #time_coarse_graining_factor = [16, 8, 8, 8, 8]
+        #tree_size = [ 32768, 32768, 32768, 32768, 16384 ]
+        #dt_sample = 0.00098304
+        #freq_lo_MHz = 400.0
+        #freq_hi_MHz = 800.0
+    
+        itree = self["tree_index"][0]
+        tree_dt = L1_config.dt_sample * L1_config.nds[itree] / L1_config.nups
+    
+        tree_max_dm = (
+                (L1_config.tree_size[itree] - 1)
+                * tree_dt
+                / (4.148806e3 * (1.0 / L1_config.freq_lo_MHz**2 - 1.0 / L1_config.freq_hi_MHz**2))
+                )
+        
+        return tree_max_dm * L1_config.dm_coarse_graining_factor[itree] / L1_config.tree_size[itree] / 2.0
+
+    def get_time_error(self):
+
+        itree = self["tree_index"][0]
+        tree_dt = L1_config.dt_sample * L1_config.nds[itree] / L1_config.nups
+
+        return tree_dt * L1_config.dm_coarse_graining_factor[itree] / 2.0
 
     def database_payloads(self):
         l1_name_map = {
