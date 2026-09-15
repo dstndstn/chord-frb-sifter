@@ -185,10 +185,10 @@ class RFISifter(Actor):
             # function adds the grade to the object itself.
             function.grade(event)
 
-            print(
-                "Applied filter %s" % self.rfi_filter_names[i]
-                + " to L2_event at time %s" % str(event.timestamp_utc)
-            )
+            # print(
+            #     "Applied filter %s" % self.rfi_filter_names[i]
+            #     + " to L2_event at time %s" % str(event.timestamp_utc)
+            # )
         return 0
 
 

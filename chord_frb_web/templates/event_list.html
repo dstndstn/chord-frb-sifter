@@ -39,6 +39,12 @@
 	  <a href="{{ url_for('l1_event_list', event_id=event['event_id']) }}">{{ event[field] }}</a>
 	{% elif field == 'n_intensity_files' %}
 	  <a href="{{ url_for('intensity_file_list', event_id=event['event_id']) }}">{{ event[field] }}</a>
+	{% elif field == 'waterfall' %}
+	  {% if event['n_intensity_files'] > 0 %}
+	    {% for eb in event['beams'] %}
+	  <a href="{{ url_for('intensity_waterfall', event_id=event['event_id'], beam_id=eb['beam_id'] ) }}">beam {{eb.beam_id}}</a>
+	    {% endfor %}
+	  {% endif %}
 	{% else %}
 	  {{ event[field] }}
 	{% endif %}

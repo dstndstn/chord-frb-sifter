@@ -47,19 +47,19 @@ def simple_process_events(pipeline, event_group):
 
     # This the famed "It's just a FOR loop" framework
     for actor in pipeline:
-        print('Actor', actor, ': feeding %i groups of events' % len(input_groups))
+        #print('Actor', actor, ': feeding %i groups of events' % len(input_groups))
         output_groups = []
         for event_group in input_groups:
-            print('Actor', actor, 'sending input group', event_group)
+            #print('Actor', actor, 'sending input group', event_group)
             groups = actor.perform_action(event_group)
-            print('Actor', actor, 'input group', event_group, '-> output groups', groups)
+            #print('Actor', actor, 'input group', event_group, '-> output groups', groups)
             if groups is None:
                 continue
             for group in groups:
                 if group is None:
                     continue
                 output_groups.append(group)
-        print('Actor', actor, ': produced %i groups' % len(output_groups))
+        #print('Actor', actor, ': produced %i groups' % len(output_groups))
         if len(output_groups) == 0:
             break
         input_groups = output_groups

@@ -232,6 +232,99 @@ def l1_event_list(event_id):
     return render_template('l1_event_list.html', event_id=event_id,
                            event=event, l1_events=r, fields=fields)
 
+@app.route('/intensity-waterfall/<int:event_id>/<int:beam_id>')
+def intensity_waterfall(event_id, beam_id):
+    import pylab as plt
+    import tempfile
+    import asdf
+    import os
+
+    query = sa.select(IntensityFile).filter_by(event_id=event_id)
+    r = db.session.execute(query).scalars()
+    print('r:', r)
+    r = list(r)
+    print('r:', r)
+    ifiles = r
+
+    does_not_exist = []
+    #paths = []
+    #times = []
+    data_chunks = []
+    for ifile in ifiles:
+        b,t = ifile.get_beam_id_and_time()
+        if b != beam_id:
+            continue
+        path = os.path.join(app.config['PIRATE_INTENSITY_DIR'], ifile.filename)
+        if not os.path.exists(path):
+            does_not_exist.append(path)
+            continue
+        with asdf.open(path) as af:
+            so = af['scales_offsets']
+            data = af['data']
+            # load from disk
+            data = data[:,:]
+            print('path:', path)
+            #print('so:', so.shape)
+            # so: shape NF,1,2
+            # scale  = so[:,:,0]
+            # offset = so[:,:,1]
+            scale  = so[:,0,0]
+            offset = so[:,0,1]
+            nf,half_nt = data.shape
+            full_data = np.zeros((nf, half_nt*2), np.float32)
+            # nibbles
+            lo_nib = (data & 0x0f).astype(np.int8)
+            hi_nib = ((data >> 4) & 0x0f).astype(np.int8)
+            # to signed two's complement
+            lo_nib = np.where(lo_nib >= 8, lo_nib - 16, lo_nib)
+            hi_nib = np.where(hi_nib >= 8, hi_nib - 16, hi_nib)
+            print('lo_nib:', lo_nib.dtype, 'min', lo_nib.min(), 'max', lo_nib.max())
+            print('lo_nib', lo_nib.shape, 'scale', scale.shape, 'offset', offset.shape)
+            lo_nib = np.where(lo_nib == -8, 0., lo_nib * scale[:,np.newaxis] + offset[:,np.newaxis])
+            hi_nib = np.where(hi_nib == -8, 0., hi_nib * scale[:,np.newaxis] + offset[:,np.newaxis])
+            full_data[:,  ::2] = lo_nib
+            full_data[:, 1::2] = hi_nib
+            data_chunks.append((af['time_chunk_index'], full_data))
+
+            #data_chunks.append((af['time_chunk_index'], data))
+            #print('keys:', af.keys())
+            #print('Time chunk:', af['time_chunk_index'], 'FPGA seq:', af['fpga_seq'])
+            #'file_format_version': 1,
+            #'nfreq': 640,
+            #'beam_id': 5,
+            #'beam_position_x': -0.03333333333333334, 'beam_position_y': -0.03333333333333334,
+            #'ntime': 256,
+            #'time_chunk_index': 91,
+            #'fpga_seq': 4542720,
+            #'unix_time_ns': 1788297831357102336,
+            #'xengine_metadata': {'version': 2, 'zone_nfreq': [640], 'zone_freq_edges': [400, 800], 'beamset': 0,
+            #      'unix_ns_at_seq_0': 1788297808098375936, 'dt_ns_per_seq': 5120, 'seq_per_frb_time_sample': 195,
+            #      'tel_origin_itrs_lat_deg': 49.32075144444, 'tel_origin_itrs_lon_deg': -119.62081125, 'tel_grid_x_axis': [0.9999743423983594, -3.7539331442772e-05, -0.007163318767675494], 'tel_grid_y_axis': [6.540338773921e-05, 0.9999924332203488, 0.003889630373557614], 'tel_dish_elev_axis': [0.9999999983813239, -5.6897733584327e-05, 0], 'tel_dish_vert_axis': [0, 0, 1], 'tel_dish_coelev_deg': 0, 'tel_dish_separation_x_m': 6.300156854906823, 'tel_dish_separation_y_m': 8.500057809796308,
+            #        'noise_variance': [1]},
+            # 'scales_offsets': <array (unloaded) shape: [640, 1, 2] dtype: float16>,
+            # 'data': array([[240,  45,  32, ..., 241, 254,  31], ... shape (640, 128)
+
+    times = [t for t,_ in data_chunks]
+    ii = np.argsort(times)
+    data = []
+    for i in ii:
+        t,d = data_chunks[i]
+        print('Time chunk', t)
+        data.append(d)
+    data = np.hstack(data)
+    print('data', data.shape)
+
+    with tempfile.NamedTemporaryFile(suffix='.png') as tf:
+        plt.clf()
+        plt.imshow(data, interpolation='nearest', origin='lower', aspect='auto')
+        #plt.colorbar()
+        plt.savefig(tf.name)
+        plotdata = open(tf.name, 'rb')
+
+        resp = make_response(plotdata)
+        resp.headers['Content-Type'] = 'image/png'
+        return resp
+
 @app.route('/intensity-file-list/<int:event_id>')
 def intensity_file_list(event_id):
     query = sa.select(IntensityFile).filter_by(event_id=event_id)
@@ -239,21 +332,12 @@ def intensity_file_list(event_id):
     print('r:', r)
     r = list(r)
 
-    # Sort -- assuming the filename pattern!
-    # filenames are like event-00010833/frame_b11_t75.asdf 
+    # Sort files
     beams,times = [],[]
     for ifile in r:
-        fn = ifile.filename
-        fn = os.path.basename(fn)
-        fn = fn.split('.')[0]
-        words = fn.split('_')
-        # yuck, man
-        beam = words[1][1:]
-        time = words[2][1:]
-        beam = int(beam)
-        time = int(time)
-        beams.append(beam)
-        times.append(time)
+        b,t = ifile.get_beam_id_and_time()
+        beams.append(b)
+        times.append(t)
     I = np.lexsort((beams, times))
     ifiles = [r[i] for i in I]
     
@@ -321,8 +405,8 @@ def event_list(): #(name=None):
     event_pager = db.paginate(query, page=page, per_page=20, error_out=False)
     events = event_pager.items
     
-    #fields = [ 'event_id', 'timestamp', 'rfi_grade', 'total_snr', 'dm', 'ra', 'dec', 'nbeams', 'dm_ne2001', 'dm_ymw2016', 'flux', 'fluence', 'pulse_width' ]
-    fields = [ 'event_id', 'timestamp', 'rfi_grade', 'best_snr', 'dm', 'ra', 'dec', 'nbeams', 'dm_ne2025', 'dm_ymw2016', 'n_intensity_files' ]#, 'flux', 'fluence', 'pulse_width' ]
+    fields = [ 'event_id', 'timestamp', 'rfi_grade', 'best_snr', 'dm', 'ra', 'dec', 'nbeams', 'dm_ne2025', 'dm_ymw2016', 'n_intensity_files', 'waterfall' ]
+    #, 'flux', 'fluence', 'pulse_width' ]
 
     return render_template('event_list.html', event_pager=event_pager, events=events, fields=fields)
 
@@ -378,6 +462,8 @@ def event_plot():
 
 if __name__ == '__main__':
     from flask import request
-    with app.test_request_context('/beam-max-snr/latest', method='GET'):
-        beam_max_snr()
+    #with app.test_request_context('/beam-max-snr/latest', method='GET'):
+    #    beam_max_snr()
+    with app.test_request_context('/intensity-waterfall/12399/5', method='GET'):
+        intensity_waterfall(12399, 5)
 

@@ -118,7 +118,7 @@ class ActionPicker(Actor):
         l1_db_objs = []
         l1_payload = [e.database_payload() for e in l1_events]
         for args in l1_payload:
-            print('L1 event db from:', args)
+            #print('L1 event db from:', args)
             db_obj = EventBeam(**args)
             session.add(db_obj)
             session.flush()
@@ -147,17 +147,17 @@ class ActionPicker(Actor):
             l2_db_obj.beams.append(e)
         # DEBUG
         session.flush()
-        print('Saved L2 event id', l2_db_obj.event_id)
+        #print('Saved L2 event id', l2_db_obj.event_id)
 
     def intensity_callback(self, event):
-        print('Intensity callback: event', event)
+        print('Intensity callback: event id %i' % event.event_id)
         # gather all beams that triggered for this grouped event.
         # FIXME -- add adjacent beams?
         beams = set([event.beam_id])
         for e in event.l1_events:
             beams.add(e['beam_id'])
         beams = list(beams)
-        print('All triggered beams:', beams)
+        #print('All triggered beams:', beams)
 
         from chord_frb_grpc.frb_search_pb2 import WriteFilesRequest, SubscribeFilesRequest
 
@@ -184,22 +184,22 @@ class ActionPicker(Actor):
         assert(dt > 0)
         dfpga = int(1e9 * dt / ns_per_fpga)
         fpga_start = event.fpga_timestamp - dfpga - fpga_buffer
-        print('FPGA range requested: %i, %i' % (fpga_start, fpga_end))
+        #print('FPGA range requested: %i, %i' % (fpga_start, fpga_end))
 
         for beamset,beams in beamset_beams.items():
             (addr, stub) = self.sifter.beamset_pirate_rpc[beamset]
-            print('Sending intensity callback to pirate RPC address:', addr, 'using stub', stub)
+            #print('Sending intensity callback to pirate RPC address:', addr, 'using stub', stub)
             acqdir = 'event-%08i' % event.event_id
             req = WriteFilesRequest(protocol_version = 2,
                                     beams = beams,
                                     fpga_seq_start = fpga_start,
                                     fpga_seq_end = fpga_end,
                                     acqdir = acqdir)
-            print('Sending WriteFilesRequest:', req)
+            #print('Sending WriteFilesRequest:', req)
             resp = stub.WriteFiles(req)
-            print('Got WriteFiles response:', resp)
+            #print('Got WriteFiles response:', resp)
 
             # The Sifter has a queue for handling pirate write request database updates
             for fn in resp.filename_list:
-                print('Pirate will write file %s' % fn)
+                #print('Pirate will write file %s' % fn)
                 self.sifter.file_update_queue.put((event.event_id, fn, None))

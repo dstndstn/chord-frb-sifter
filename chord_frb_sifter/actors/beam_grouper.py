@@ -136,8 +136,8 @@ class BeamGrouper(Actor):
 
         """
         events = event_group.events
-        print('Beam grouper: %i events' % len(events))
-        print('First event:', events[0])
+        #print('Beam grouper: %i events' % len(events))
+        #print('First event:', events[0])
         groups = self._cluster(events)
 
         beam_activity = len(set([e['beam_id'] for e in events]))

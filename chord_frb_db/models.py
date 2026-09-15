@@ -1,4 +1,5 @@
 from datetime import datetime
+import os
 
 from sqlalchemy.orm import DeclarativeBase
 from typing import List
@@ -138,7 +139,31 @@ class IntensityFile(Base):
         if self.failed:
             return 'red'
         return 'yellow'
-    
+
+    # HACK -- these two functions assume the filename pattern
+    # like event-00010833/frame_b11_t75.asdf
+    def get_beam_id(self):
+        beam,_ = self.get_beam_id_and_time()
+        return beam
+
+    def get_time_chunk(self):
+        _,time = self.get_beam_id_and_time()
+        return time
+
+    def get_beam_id_and_time(self):
+        fn = self.filename
+        # grab just the filename part --> "frame_b11_t75.asdf"
+        fn = os.path.basename(fn)
+        # drop the ".*" suffix --> "frame_b11_t75"
+        fn = fn.split('.')[0]
+        words = fn.split('_')
+        # assume X_b(BEAM)_t(TIME)
+        beam = words[1][1:]
+        time = words[2][1:]
+        beam = int(beam)
+        time = int(time)
+        return beam,time
+
 class KnownSource(Base):
     __tablename__ = 'known_source'
     id:          Mapped[int] = mapped_column(primary_key=True)
@@ -238,6 +263,15 @@ if __name__ == '__main__':
     Base.metadata.create_all(engine)
 
     from sqlalchemy.orm import Session
+    import sqlalchemy as sa
+
+    with Session(engine) as session:
+        events = session.execute(sa.select(Event)).scalars()
+        for e in events:
+            print(e.event_id)
+    import sys
+    sys.exit(0)
+
     with Session(engine) as session:
         d = DumbTest(x=42)
         session.add(d)

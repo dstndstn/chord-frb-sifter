@@ -40,6 +40,6 @@ class EventIdStamper(Actor):
                 eid = self.event_id_queue.get()
                 l1.id = eid
             eid = self.event_id_queue.get()
-            print('Stamped L2 event id', eid)
+            #print('Stamped L2 event id', eid)
             event.event_id = eid
         return [event_group]

@@ -75,7 +75,7 @@ class BeamBuffer(Actor):
         # the normal case is to "break" out
         while True:
             if self.current_chunk is None:
-                print('Starting to collect event_group for chunk %s' % event_group.chunk_utc)
+                #print('Starting to collect event_group for chunk %s' % event_group.chunk_utc)
                 self.current_chunk = event_group.chunk_utc
     
             if event_group.chunk_utc == self.current_chunk:
@@ -83,7 +83,7 @@ class BeamBuffer(Actor):
                 self.current_beamsets.add(event_group.beamset)
                 if self.current_beamsets == self.expecting_beamsets:
                     # Received all beamsets - flush events!
-                    print('Received all beamsets expected for chunk %s' % event_group.chunk_utc)
+                    #print('Received all beamsets expected for chunk %s' % event_group.chunk_utc)
                     _flush()
                     self.buffered_events = []
                     self.current_chunk = None
@@ -104,7 +104,7 @@ class BeamBuffer(Actor):
                 if self.expecting_beamsets is None:
                     # If we're starting up -- next chunk, we expect the same beamsets
                     self.expecting_beamsets = self.current_beamsets
-                    print('Received the first event_group for the next chunk')
+                    #print('Received the first event_group for the next chunk')
                 else:
                     print('Received an unexpected event_group for chunk %s while processing chunk %s' %
                           (event_group.chunk_utc, self.current_chunk))

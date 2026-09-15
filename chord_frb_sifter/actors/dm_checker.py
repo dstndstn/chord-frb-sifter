@@ -83,7 +83,7 @@ class DMChecker(Actor):
             dm_measured = event.dm
             dm_uncertainty = event.dm_error
 
-            print('Looking up predicted DMs from maps...')
+            #print('Looking up predicted DMs from maps...')
 
             dm_ymw16  = float(self.interp_map_ymw16 (event.ra, event.dec))
             dm_ne2025 = float(self.interp_map_ne2025(event.ra, event.dec))

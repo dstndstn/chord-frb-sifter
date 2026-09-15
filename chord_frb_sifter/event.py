@@ -103,7 +103,7 @@ class L1Event(AttribDict):
         # my name -> db name (or True if the name is the same)
         l1_name_map = {
             'id': True,
-            'beam_id': 'beam',
+            'beam_id': True,
             'snr': True,
             'fpga_timestamp': 'timestamp_fpga',
             'timestamp_utc': True,

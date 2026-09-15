@@ -206,15 +206,15 @@ class FrbSifter(frb_sifter_pb2_grpc.FrbSifterServicer):
         msg = ''
         ok = True
 
-        print(('Got FRB Events grpc: beam-set %i, chunk FPGA %i to %i, ' +
-               'coarse-grain SNR array: %i beams; ' +
-               'events: %i, ' +
-               'peer: %s, is_fake? %s') %
-              (request.beam_set_id, request.chunk_fpga_start, request.chunk_fpga_end,
-               len(request.coarsegrain_snr),
-               len(request.events), 
-               context.peer(),
-               self.peer_is_fake.get(context.peer(), 'unknown')))
+        # print(('Got FRB Events grpc: beam-set %i, chunk FPGA %i to %i, ' +
+        #        'coarse-grain SNR array: %i beams; ' +
+        #        'events: %i, ' +
+        #        'peer: %s, is_fake? %s') %
+        #       (request.beam_set_id, request.chunk_fpga_start, request.chunk_fpga_end,
+        #        len(request.coarsegrain_snr),
+        #        len(request.events), 
+        #        context.peer(),
+        #        self.peer_is_fake.get(context.peer(), 'unknown')))
         #for e in request.events:
         #    print('  event', type(e), e)
 
@@ -237,7 +237,7 @@ class FrbSifter(frb_sifter_pb2_grpc.FrbSifterServicer):
             # CHIME/FRB's rfi_grade_level2
             # values are 0 to 10, with RFI:0 and Astrophysical:10.
             event['rfi_grade_level1'] = 10. * (1. - event['rfi_prob'])
-            print('Created L1Event:', event)
+            #print('Created L1Event:', event)
             event_list.append(event)
 
         # Send event list even if empty - BeamBuffer needs to know it has heard from all beamsets.
@@ -260,12 +260,12 @@ class FrbSifter(frb_sifter_pb2_grpc.FrbSifterServicer):
 def file_update_rpc_reader(stream, file_update_queue, beamset):
     print('file_update_handler starting for beamset', beamset)
     try:
-        print('stream:', stream)
+        #print('stream:', stream)
         for val in stream:
-            print('Got file update for beamset', beamset)
-            print('file update:', val)
+            #print('Got file update for beamset', beamset)
+            #print('file update:', val)
             notif = val.notification
-            print('notification:', notif)
+            #print('notification:', notif)
             err = notif.error_message
             if err:
                 print('filename: %s failed: error message: %s' % (notif.filename, err))
@@ -284,21 +284,32 @@ def file_update_rpc_reader(stream, file_update_queue, beamset):
 def file_update_db_handler(file_update_queue, database):
     import sqlalchemy as sa
     from sqlalchemy.orm import Session
-    from chord_frb_db.models import IntensityFile
+    from chord_frb_db.models import IntensityFile, Event
 
     with Session(database) as session:
         while True:
             fup = file_update_queue.get()
             (event_id, filename, error_message) = fup
-            print('Sending file update to db: event %s, filename %s, err %s' %
-                  (event_id, filename, error_message))
+            #print('Sending file update to db: event %s, filename %s, err %s' %
+            #      (event_id, filename, error_message))
 
             # We either get
             # (event_id, filename, None) --> pirate told us it's going to write this file
             # or
             # (None, filename, error_message) --> pirate updated us about this file
             #
-            
+
+            if event_id is not None:
+                # Check that this event_id exists in the database... we can get a race condition
+                # between this thread and the event-inserting database thread!
+                event = session.execute(sa.select(Event).where(Event.event_id==event_id)).scalar_one_or_none()
+                if event is None:
+                    print('File update: event id %i does not exist in the database yet' % event_id)
+                    # re-queue for later processing
+                    # FIXME -- sleep for a bit of queue is empty?
+                    file_update_queue.put(fup)
+                    continue
+
             # create if it doesn't exist, update its status if it does
             ifile = session.execute(sa.select(IntensityFile).where(
                 IntensityFile.filename==filename)).scalar_one_or_none()
@@ -445,8 +456,8 @@ def beam_snr_handler(sifter, beam_snr_queue, database):
                 seq_per_frb_time_sample = xengine['seq_per_frb_time_sample']
                 fpga0_nano = xengine['unix_ns_at_seq_0']
                 nano_per_fpga = xengine['dt_ns_per_seq']
-                print('FPGA seq per time sample:', seq_per_frb_time_sample)
-                print('nanoseconds per FPGA seq:', nano_per_fpga)
+                #print('FPGA seq per time sample:', seq_per_frb_time_sample)
+                #print('nanoseconds per FPGA seq:', nano_per_fpga)
     
             unix_time_nano_start = fpga0_nano + fpga_start * nano_per_fpga
             unix_time_nano_end   = fpga0_nano + fpga_end   * nano_per_fpga
@@ -464,7 +475,7 @@ def beam_snr_handler(sifter, beam_snr_queue, database):
                 #print('Saving BeamSNR to db:', bs)
                 session.add(bs)
                 session.flush()
-                print('Saved BeamSNR to database: id', bs.id)
+                #print('Saved BeamSNR to database: id', bs.id)
                 session.commit()
             except Exception as e:
                 import traceback
