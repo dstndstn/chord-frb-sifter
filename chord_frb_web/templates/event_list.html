@@ -29,7 +29,7 @@
     <tr>
       {% for field in fields %}
       <td>
-	{% if field in ['total_snr', 'dm', 'dm_ne2001', 'dm_ymw2016'] %}
+	{% if field in ['total_snr', 'dm', 'dm_ne2025', 'dm_ymw2016'] %}
 	{% if event[field] %}
 	{{ event[field]|round(2) }}
 	{% else %}

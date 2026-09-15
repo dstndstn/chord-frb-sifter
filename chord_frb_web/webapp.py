@@ -322,7 +322,7 @@ def event_list(): #(name=None):
     events = event_pager.items
     
     #fields = [ 'event_id', 'timestamp', 'rfi_grade', 'total_snr', 'dm', 'ra', 'dec', 'nbeams', 'dm_ne2001', 'dm_ymw2016', 'flux', 'fluence', 'pulse_width' ]
-    fields = [ 'event_id', 'timestamp', 'rfi_grade', 'best_snr', 'dm', 'ra', 'dec', 'nbeams', 'dm_ne2001', 'dm_ymw2016', 'n_intensity_files' ]#, 'flux', 'fluence', 'pulse_width' ]
+    fields = [ 'event_id', 'timestamp', 'rfi_grade', 'best_snr', 'dm', 'ra', 'dec', 'nbeams', 'dm_ne2025', 'dm_ymw2016', 'n_intensity_files' ]#, 'flux', 'fluence', 'pulse_width' ]
 
     return render_template('event_list.html', event_pager=event_pager, events=events, fields=fields)
 
