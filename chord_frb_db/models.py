@@ -21,7 +21,9 @@ class Base(DeclarativeBase):
 class Event(Base):
     __tablename__ = 'event'
     event_id:  Mapped[int] = mapped_column(primary_key=True)
-    # ... FRB time at infinite frequency?  What time format?  Seconds since 1970.0
+    # ... FRB time at infinite frequency?  What time format?  Unix: seconds since 1970.0, UTC
+    ##... actually I think this is the time at the bottom of the frequency band
+    ## (based on the frb_sifter.proto grpc call documentation)
     timestamp: Mapped[Optional[float]] = mapped_column(Double)
     is_rfi:    Mapped[bool] = mapped_column(default=False)
     # matches a known pulsar
@@ -76,6 +78,12 @@ class Event(Base):
 
     #def __repr__(self) -> str:
     #    return f"User(id={self.id!r}, name={self.name!r}, fullname={self.fullname!r})"
+
+    def get_datetime_string(self):
+        from datetime import datetime, UTC
+        d = datetime.fromtimestamp(self.timestamp, tz=UTC)
+        d = d.isoformat(sep=' ')[:23]
+        return d
 
     @property
     def n_intensity_files(self):

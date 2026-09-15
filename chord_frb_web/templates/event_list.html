@@ -24,17 +24,28 @@
       {% for field in fields %}
       <th>{{field}}</th>
       {% endfor %}
-      </tr>
+    </tr>
+    <tr>
+      {% for u in units %}
+      <th>{{u}}</th>
+      {% endfor %}
+    </tr>
     {% for event in events %}
     <tr>
       {% for field in fields %}
       <td>
-	{% if field in ['total_snr', 'dm', 'dm_ne2025', 'dm_ymw2016'] %}
-	{% if event[field] %}
-	{{ event[field]|round(2) }}
-	{% else %}
-	{{ event[field] }}
-	{% endif %}
+	{# comment TWO DIGITS OF ACCURACY #}
+	{% if field in ['best_snr', 'dm', 'dm_ne2025', 'dm_ymw2016'] %}
+	  {% if event[field] %}
+	    {{ "%.2f" % event[field] }}
+	  {% endif %}
+	{# comment THREE DIGITS OF ACCURACY #}
+	{% elif field in ['ra', 'dec', 'timestamp', 'rfi_grade', ] %}
+	  {% if event[field] %}
+	    {{ "%.3f" % event[field] }}
+	  {% endif %}
+	{% elif field == 'datetime' %}
+	  {{ event.get_datetime_string() }}
 	{% elif field == 'nbeams' %}
 	  <a href="{{ url_for('l1_event_list', event_id=event['event_id']) }}">{{ event[field] }}</a>
 	{% elif field == 'n_intensity_files' %}

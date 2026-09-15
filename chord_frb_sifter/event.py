@@ -220,9 +220,9 @@ class L2Event(AttribDict):
                     print('val: "%s"' % v)
 
             v = to_db_type(v)
-            if k == 'timestamp_utc':
-                # microseconds -> seconds
-                v *= 1e-6
+            # if k == 'timestamp_utc':
+            #     # microseconds -> seconds
+            #     v *= 1e-6
             if k == 'flux_mjy':
                 # milli -> Jansky
                 v *= 0.001

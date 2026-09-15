@@ -405,10 +405,12 @@ def event_list(): #(name=None):
     event_pager = db.paginate(query, page=page, per_page=20, error_out=False)
     events = event_pager.items
     
-    fields = [ 'event_id', 'timestamp', 'rfi_grade', 'best_snr', 'dm', 'ra', 'dec', 'nbeams', 'dm_ne2025', 'dm_ymw2016', 'n_intensity_files', 'waterfall' ]
+    fields = [ 'event_id', 'timestamp', 'datetime', 'rfi_grade', 'best_snr', 'dm', 'ra', 'dec', 'nbeams', 'dm_ne2025', 'dm_ymw2016', 'n_intensity_files', 'waterfall' ]
     #, 'flux', 'fluence', 'pulse_width' ]
+    units = [ '', '(sec, UTC)', '', '(10=astro)', '', '', '(deg)', '(deg)', '', '', '', '', '']
 
-    return render_template('event_list.html', event_pager=event_pager, events=events, fields=fields)
+    return render_template('event_list.html', event_pager=event_pager, events=events, fields=fields,
+                           units=units)
 
 @app.route('/events.png')
 def event_plot():
