@@ -12,6 +12,8 @@ from flask_sqlalchemy import SQLAlchemy
 from chord_frb_db.models import Event, EventBeam, IntensityFile
 from chord_frb_db.models import PirateConfig, BeamSNR
 
+from chord_frb_sifter.common import dispersion_delay
+
 import sqlalchemy as sa
 #from sqlalchemy import func, select
 from sqlalchemy.orm import Session
@@ -228,7 +230,7 @@ def l1_event_list(event_id):
     event = db.session.execute(query).scalar_one()
     print('event:', event)
 
-    fields = ['beam_id', 'snr', 'timestamp_utc', 'timestamp_fpga']
+    fields = ['beam_id', 'snr', 'timestamp_utc', 'timestamp_fpga', 'dm']
     return render_template('l1_event_list.html', event_id=event_id,
                            event=event, l1_events=r, fields=fields)
 
@@ -247,9 +249,8 @@ def intensity_waterfall(event_id, beam_id):
     ifiles = r
 
     does_not_exist = []
-    #paths = []
-    #times = []
     data_chunks = []
+    time_vals = []
     for ifile in ifiles:
         b,t = ifile.get_beam_id_and_time()
         if b != beam_id:
@@ -264,10 +265,7 @@ def intensity_waterfall(event_id, beam_id):
             # load from disk
             data = data[:,:]
             print('path:', path)
-            #print('so:', so.shape)
             # so: shape NF,1,2
-            # scale  = so[:,:,0]
-            # offset = so[:,:,1]
             scale  = so[:,0,0]
             offset = so[:,0,1]
             nf,half_nt = data.shape
@@ -278,15 +276,21 @@ def intensity_waterfall(event_id, beam_id):
             # to signed two's complement
             lo_nib = np.where(lo_nib >= 8, lo_nib - 16, lo_nib)
             hi_nib = np.where(hi_nib >= 8, hi_nib - 16, hi_nib)
-            print('lo_nib:', lo_nib.dtype, 'min', lo_nib.min(), 'max', lo_nib.max())
-            print('lo_nib', lo_nib.shape, 'scale', scale.shape, 'offset', offset.shape)
+            #print('lo_nib:', lo_nib.dtype, 'min', lo_nib.min(), 'max', lo_nib.max())
+            #print('lo_nib', lo_nib.shape, 'scale', scale.shape, 'offset', offset.shape)
             lo_nib = np.where(lo_nib == -8, 0., lo_nib * scale[:,np.newaxis] + offset[:,np.newaxis])
             hi_nib = np.where(hi_nib == -8, 0., hi_nib * scale[:,np.newaxis] + offset[:,np.newaxis])
             full_data[:,  ::2] = lo_nib
             full_data[:, 1::2] = hi_nib
             data_chunks.append((af['time_chunk_index'], full_data))
-
-            #data_chunks.append((af['time_chunk_index'], data))
+            xe = af['xengine_metadata']
+            freq_edges = xe['zone_freq_edges']
+            time_vals.append((af['fpga_seq'],
+                              af['unix_time_ns'] * 1e-9,
+                              xe['dt_ns_per_seq'],
+                              xe['seq_per_frb_time_sample'],
+                              min(freq_edges), max(freq_edges)
+                              ))
             #print('keys:', af.keys())
             #print('Time chunk:', af['time_chunk_index'], 'FPGA seq:', af['fpga_seq'])
             #'file_format_version': 1,
@@ -306,17 +310,64 @@ def intensity_waterfall(event_id, beam_id):
 
     times = [t for t,_ in data_chunks]
     ii = np.argsort(times)
-    data = []
+    minchunk = times[ii[0]]
+    maxchunk = times[ii[-1]]
+    nchunks = 1+maxchunk-minchunk
+    _,d0 = data_chunks[0]
+    h,w = d0.shape
+
+    data = np.zeros((h, w*nchunks), d0.dtype)
     for i in ii:
         t,d = data_chunks[i]
-        print('Time chunk', t)
-        data.append(d)
-    data = np.hstack(data)
-    print('data', data.shape)
+        #print('Time chunk', t, 'shape', d.shape)
+        data[:, w*(t - minchunk):w*(1 + t - minchunk)] = d
+
+    _,w_tot = data.shape
+
+    (fpga_min, unix_min, ns_per_seq, seq_per_frb_sample, min_freq, max_freq) = time_vals[ii[0]]
+    ns_per_frb_sample = ns_per_seq * seq_per_frb_sample
+
+    query = sa.select(Event).filter_by(event_id=event_id)
+    event = db.session.execute(query).scalar_one()
+    #print('event:', str(event))
+    print('ns per sample:', ns_per_frb_sample)
+    print('event: timestamp', event.timestamp, 'DM', event.dm)
+    print('dump time min:',   unix_min)
+    print('dump time max:',   unix_min + w_tot * ns_per_frb_sample * 1e-9)
+    # Time at bottom of the band
+    print('timestamp - dump min:', event.timestamp - unix_min)
+    t_bottom = event.timestamp
+    delay1 = dispersion_delay(event.dm, min_freq)
+    delay0 = dispersion_delay(event.dm, max_freq)
+    # Time at top of the band
+    t_top = t_bottom - (delay1 - delay0)
+    print('time at top of band - dump min:', t_top - unix_min)
+
+    # Pixel at top
+    pixel_top = (t_top - unix_min) / (ns_per_frb_sample * 1e-9)
+    pixel_bottom = (t_bottom - unix_min) / (ns_per_frb_sample * 1e-9)
+    print('Pixel of top, bottom: %.1f, %.1f' % (pixel_top, pixel_bottom))
+
+    dfreq = (max_freq - min_freq) / h
+
+    freqs = (np.arange(h) + 0.5) * dfreq + min_freq
+    delays = dispersion_delay(event.dm, freqs)
+    delays_pix = (delays - delay0) / (ns_per_frb_sample * 1e-9)
 
     with tempfile.NamedTemporaryFile(suffix='.png') as tf:
         plt.clf()
-        plt.imshow(data, interpolation='nearest', origin='lower', aspect='auto')
+        plt.imshow(data, interpolation='nearest', origin='lower', aspect='auto',
+                   extent=[-0.5, w_tot-0.5, min_freq - dfreq/2., max_freq + dfreq/2])
+        plt.xlabel('Time (FRB samples)')
+        plt.ylabel('Freq (MHz)')
+        ax = plt.axis()
+        plt.plot(pixel_top, max_freq, 'ro')
+        plt.plot(pixel_bottom, min_freq, 'ro')
+        #plt.plot(pixel_top + delays_pix, freqs, 'r--')
+        plt.plot(pixel_top + delays_pix - 500, freqs, 'r--')
+        plt.plot(pixel_top + delays_pix + 500, freqs, 'r--')
+        plt.axis(ax)
+        plt.title('Event %i, beam %i: DM %.1f' % (event_id, beam_id, event.dm))
         #plt.colorbar()
         plt.savefig(tf.name)
         plotdata = open(tf.name, 'rb')
@@ -466,6 +517,13 @@ if __name__ == '__main__':
     from flask import request
     #with app.test_request_context('/beam-max-snr/latest', method='GET'):
     #    beam_max_snr()
-    with app.test_request_context('/intensity-waterfall/12399/5', method='GET'):
-        intensity_waterfall(12399, 5)
+    #with app.test_request_context('/intensity-waterfall/12399/5', method='GET'):
+    #intensity_waterfall(12399, 5)
+    from flask.testing import FlaskClient
 
+    client = FlaskClient(app)
+    response = client.get('/intensity-waterfall/259449/11') #12399/5')
+    print(response)
+    print(len(response.data), 'data')
+    open('out.png','wb').write(response.data)
+    
