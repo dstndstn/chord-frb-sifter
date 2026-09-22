@@ -226,6 +226,8 @@ class FrbSifter(frb_sifter_pb2_grpc.FrbSifterServicer):
             # FIXME -- we should use introspection to get the keys defined in frb_sifter.proto....
             event = L1Event(is_incoherent=False,
                             is_fake=is_fake)
+            print('GRPC event: beam %i, FPGA %i, DM %.1f, SNR %.1f' %
+                  (e.beam_id, e.fpga_timestamp, e.dm, e.snr))
             for key in ['beam_id', 'fpga_timestamp', 'dm', 'snr', 'rfi_prob',
                         'width_ms', 'subband_freq_lo_MHz', 'subband_freq_hi_MHz',
                         'tree_index']:

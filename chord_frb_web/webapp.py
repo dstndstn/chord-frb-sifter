@@ -463,30 +463,44 @@ def event_list(): #(name=None):
     return render_template('event_list.html', event_pager=event_pager, events=events, fields=fields,
                            units=units)
 
+@app.route('/events-beam<int:beam_id>.png')
+def event_plot_beam(beam_id):
+    query = sa.select(EventBeam).where(EventBeam.beam_id==beam_id).order_by(EventBeam.id.desc()).limit(1000)
+    r = db.session.execute(query)
+    return plot_events(r, color='snr', vmin=0, vmax=None, color_label='SNR')
+
 @app.route('/events.png')
 def event_plot():
-    from datetime import datetime
-
     query = sa.select(Event).order_by(Event.event_id.desc()).limit(1000)
     print('Query:', query)
     r = db.session.execute(query)#.scalar()
     print('Result:', r)
+    return plot_events(r)
 
+def plot_events(r, color='rfi_grade', color_label='RFI Grade', vmin=0, vmax=10):
+    from datetime import datetime
     xx = []
     yy = []
     cc = []
 
+    t0 = None
     for e in r:
         (e,) = e
         #print('  event:', e)
+        if t0 is None:
+            t0 = e.timestamp
+        else:
+            # HACK - 60-sec max
+            if (t0 - e.timestamp) > 60:
+                break
         d = datetime.fromtimestamp(e.timestamp)
         print('timestamp:', e.timestamp, '-> date', d)
         xx.append(d)
         #xx.append(e.timestamp)
         #xx.append(e.event_id)
         yy.append(e.dm)
-        cc.append(e.rfi_grade)
-
+        #cc.append(e.rfi_grade)
+        cc.append(getattr(e, color))
 
     from io import BytesIO
     from matplotlib.figure import Figure
@@ -494,7 +508,7 @@ def event_plot():
     
     fig = Figure()
     ax = fig.subplots()
-    scat = ax.scatter(xx, yy, c=cc, s=4, vmin=0, vmax=10, cmap='inferno')#copper')
+    scat = ax.scatter(xx, yy, c=cc, s=4, vmin=vmin, vmax=vmax, cmap='inferno')#copper')
     ax.set_yscale('log')
     ax.set_xlabel('Date')
     ax.set_ylabel('DM')
@@ -503,7 +517,8 @@ def event_plot():
     #cax = divider.append_axes('right', size='5%', pad=0.05)
     #fig.colorbar(scat, cax=cax, orientation='vertical')
     cb = fig.colorbar(scat, cax=None, ax=ax)
-    cb.set_label('RFI grade')
+    cb.set_label(color_label)
+    #cb.set_label('RFI grade')
     buf = BytesIO()
     fig.savefig(buf, format="png")
     #buf = buf.getbuffer()

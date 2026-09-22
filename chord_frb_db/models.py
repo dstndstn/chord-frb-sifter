@@ -131,6 +131,10 @@ class EventBeam(Base):
     event_id: Mapped[Optional[int]] = mapped_column(ForeignKey("event.event_id"))
     event:     Mapped['Event'] = relationship(back_populates='beams')
 
+    @property
+    def timestamp(self):
+        return self.timestamp_utc
+
 class IntensityFile(Base):
     __tablename__ = 'intensity_file'
     filename:    Mapped[str] = mapped_column(String(1024), primary_key=True)
