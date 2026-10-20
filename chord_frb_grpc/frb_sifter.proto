@@ -95,13 +95,12 @@ message FrbEvent {
 
 message FrbEventsMessage {
   bool from_simulator = 1;
-  int32 beam_set_id = 2;
   int64 chunk_fpga_start = 3;
   int64 chunk_fpga_end = 4;
   repeated FrbEvent events = 5;
 
   // Coarse-grained triggers
-  // A small array of SNRs, the same length as the beams being handled by this beam_set_id.
+  // A small array of SNRs, the same length as the beams being handled by this pirate.
   repeated double coarsegrain_snr = 6;
 }
 

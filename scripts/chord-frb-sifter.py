@@ -1,4 +1,6 @@
 import time
+import threading
+
 from chord_frb_grpc import frb_sifter_pb2_grpc
 from chord_frb_grpc.frb_sifter_pb2 import ConfigReply, FrbEventsReply
 import queue
@@ -37,6 +39,11 @@ class FrbSifter(frb_sifter_pb2_grpc.FrbSifterServicer):
         self.subscribe_files_threads = []
         self.file_update_queue = queue.SimpleQueue()
         
+        # lock for managing beamset state - because the gRPC CheckConfiguration
+        # call that manipulates it could be called simulataneously by multiple
+        # pirates.
+        self.beamset_lock = threading.Lock()
+
         # beamset (int) -> arrays of (id, x, y)
         self.beamset_meta = {}
 
@@ -48,7 +55,10 @@ class FrbSifter(frb_sifter_pb2_grpc.FrbSifterServicer):
 
         # beam_id to beamset
         self.beam_id_to_beamset = {}
-        
+
+        # gRPC address (of the grouper) to beamset
+        self.peer_to_beamset = {}
+
         # is a gRPC peer address the fake x-engine??
         self.peer_is_fake = {}
 
@@ -80,6 +90,9 @@ class FrbSifter(frb_sifter_pb2_grpc.FrbSifterServicer):
                 line = line[:96] + ' ...'
             print('    ' + line)
 
+    '''
+    This is the first gRPC message called by a Pirate instance
+    '''
     def CheckConfiguration(self, request, context):
         print('CheckConfiguration: context', context)
         print('  peer:', context.peer())
@@ -107,20 +120,8 @@ class FrbSifter(frb_sifter_pb2_grpc.FrbSifterServicer):
 
     def check_configs(self, peer, xengine_yaml, pirate_yaml, dedisp_yaml, grouper_yaml, pirate_rpc):
         xengine = yaml.load(xengine_yaml, Loader=Loader)
-        beamset = xengine['beamset']
-        new_meta = (xengine['beam_ids'],
-                    xengine['beam_positions_x'],
-                    xengine['beam_positions_y'])
-        if beamset in self.beamset_meta:
-            print('Already received beamset %i - checking consistency' % beamset)
-            if new_meta != self.beamset_meta[beamset]:
-                print('Metadata for beamset %i not equal:\n%s\nvs\n%s' %
-                      (beamset, new_meta, self.beamset_meta[beamset]))
-                return False
-        else:
-            self.beamset_meta[beamset] = new_meta
 
-        # Fake x-engine sending us injected events?  Don't validate.
+        # Fake x-engine sending us injected events?  Don't validate its gRPC callback address
         is_fake = ((len(xengine_yaml) > 0) and
                    (len(pirate_yaml) == 0) and
                    (len(dedisp_yaml) == 0) and
@@ -128,29 +129,63 @@ class FrbSifter(frb_sifter_pb2_grpc.FrbSifterServicer):
                    (len(pirate_rpc) == 0))
         if is_fake:
             print('Only x-engine yaml is non-empty -- assuming fake x-engine message')
-
         assert(peer not in self.peer_is_fake)
         self.peer_is_fake[peer] = is_fake
 
-        if not is_fake:
-            # Populate beam info: beam x,y
-            for beam_id, beam_x, beam_y in zip(xengine['beam_ids'],
-                                               xengine['beam_positions_x'],
-                                               xengine['beam_positions_y']):
-                new_val = (beam_x, beam_y)
-                if beam_id in self.beam_id_to_xy:
-                    old_val = self.beam_id_to_xy[beam_id]
-                    if new_val != old_val:
-                        print('Already received beam_id %i with conflicting value: old %s, new %s' %
-                              (beam_id, old_val, new_val))
-                        return False
-                self.beam_id_to_xy[beam_id] = new_val
+        # Each pirate used to know its own "beamset" int id, and we keyed a lot
+        # of stuff off that.  Now, instead, we assign and manage the beamset
+        # here.
 
-                self.beam_id_to_beamset[beam_id] = beamset
+        with self.beamset_lock:
+            # Check for any overlap between existing beam ids and new beam ids.
+            beam_ids = xengine['beam_ids']
+            old_beamsets = set()
+            for beam in beam_ids:
+                if beam in self.beam_id_to_beamset:
+                    old_beamsets.add(self.beam_id_to_beamset[beam])
+
+            new_meta = (xengine['beam_ids'],
+                        xengine['beam_positions_x'],
+                        xengine['beam_positions_y'])
+
+            if len(old_beamsets) == 0:
+                # No overlap -- assign new beamset.
+                beamset = len(self.beamset_meta)
+                assert(beamset not in self.beamset_meta)
+            elif len(old_beamsets) == 1:
+                # Updating an existing beamset (ie, restarting one pirate)
+                beamset = list(old_beamsets)[0]
+                # Only allow this if the set of beam ids is the same (not a subset)
+                old_beam_ids,_,_ = self.beamset_meta[beamset]
+                if set(old_beam_ids) != set(beam_ids):
+                    beamset = None
+            else:
+                beamset = None
+            if beamset is None:
+                print('Cannot handle a pirate handling a partially-overlapping set of beam ids.')
+                return False
+
+            self.beamset_meta[beamset] = new_meta
+
+            if not is_fake:
+                # Populate beam info: beam x,y
+                for beam_id, beam_x, beam_y in zip(xengine['beam_ids'],
+                                                   xengine['beam_positions_x'],
+                                                   xengine['beam_positions_y']):
+                    new_val = (beam_x, beam_y)
+                    if beam_id in self.beam_id_to_xy:
+                        old_val = self.beam_id_to_xy[beam_id]
+                        if new_val != old_val:
+                            print('Already received beam_id %i with conflicting x,y value: old %s, new %s' %
+                                  (beam_id, old_val, new_val))
+                            return False
+                    self.beam_id_to_xy[beam_id] = new_val
+                    self.beam_id_to_beamset[beam_id] = beamset
+
+                self.peer_to_beamset[peer] = beamset
 
             # delta-RA,delta-Dec of beam positions relative to boresight.
 
-                
         if not is_fake:
             import grpc
             from chord_frb_grpc.frb_search_pb2_grpc import FrbSearchStub
@@ -183,13 +218,12 @@ class FrbSifter(frb_sifter_pb2_grpc.FrbSifterServicer):
                 print('Response is a', type(resp))
                 print('Response is', resp)
                 # Create a thread to continue reading updates from this pirate?
-                import threading
                 t = threading.Thread(target=file_update_rpc_reader,
                                      args=(resp, self.file_update_queue, beamset),
                                      name='file-update-handler-beamset-%i' % beamset)
                 self.subscribe_files_threads.append(t)
                 t.start()
-                
+
         # save parsed and yaml xengine config
         self.xengine_config = xengine
         self.xengine_config_yaml = xengine_yaml
@@ -218,7 +252,11 @@ class FrbSifter(frb_sifter_pb2_grpc.FrbSifterServicer):
         #for e in request.events:
         #    print('  event', type(e), e)
 
-        is_fake = self.peer_is_fake.get(context.peer())
+        peer = context.peer()
+        is_fake = self.peer_is_fake.get(peer)
+        # This peer should exist if it has sent the CheckConfig message first
+        # (we could check this...)
+        beamset = self.peer_to_beamset[peer]
 
         # Convert grpc FrbEvent objects into simple dicts.
         event_list = []
@@ -245,16 +283,17 @@ class FrbSifter(frb_sifter_pb2_grpc.FrbSifterServicer):
         # Send event list even if empty - BeamBuffer needs to know it has heard from all beamsets.
         event_group = EventGroup(is_fake=is_fake,
                                  chunk_fpga_start=request.chunk_fpga_start,
-                                 beamset=request.beam_set_id,
+                                 beamset=beamset,
                                  events=event_list)
         self.event_queue.put(event_group)
 
         if not is_fake and len(request.coarsegrain_snr):
-            self.beam_snr_queue.put(dict(beamset=request.beam_set_id,
+            # This is the only place where items are put onto the beam_snr_queue.
+            self.beam_snr_queue.put(dict(beamset=beamset,
                                          fpga_start=request.chunk_fpga_start,
                                          fpga_end=request.chunk_fpga_end,
                                          beam_snr=request.coarsegrain_snr,
-                                         peer=context.peer()))
+                                         peer=peer))
 
         return FrbEventsReply(ok=ok, message=msg)
 
@@ -506,7 +545,6 @@ tel_dish_separation_y_m: 8.5000578097963082
 '''
 
 def main():
-    import threading
     from chord_frb_db.utils import get_db_engine
     #from chord_frb_sifter.pipeline import setup, simple_create_pipeline
     #from chord_frb_sifter.pipeline import simple_process_events
