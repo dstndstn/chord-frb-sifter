@@ -242,14 +242,6 @@ class BeamSNR(Base):
     # beam_snr
     beam_snr: Mapped[List[float]] = mapped_column(ARRAY(REAL, dimensions=1, zero_indexes=True))
 
-class DumbTest(Base):
-    __tablename__ = 'dumb_test'
-    id:   Mapped[int] = mapped_column(primary_key=True)
-    #id:   Mapped[int] = mapped_column(BigInteger, primary_key=True)
-    x: Mapped[int]
-
-#class EventId(Base):
-#    id:
 from sqlalchemy.schema import Sequence
 
 event_id_sequence = Sequence('event_id_sequence', start=1, metadata=Base.metadata)
@@ -285,11 +277,6 @@ if __name__ == '__main__':
     sys.exit(0)
 
     with Session(engine) as session:
-        d = DumbTest(x=42)
-        session.add(d)
-        session.flush()
-        print('d id', d.id)
-    
         e = EventBeam(dm=42, beam_id=900, snr=20, timestamp_utc=1400000, timestamp_fpga=10000,
                       time_error=0., tree_index=0, rfi_grade=0, rfi_mask_fraction=0.,
                       rfi_clip_fraction=0., dm_error=0.1, ra=0., dec=0., ra_error=0., dec_error=0.)
