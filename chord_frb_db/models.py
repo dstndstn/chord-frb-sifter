@@ -266,6 +266,8 @@ class BeamSNR(Base):
 
 class Liveness(Base):
     __tablename__ = 'liveness'
+    # ???
+    #sifter_run_id: Mapped[Optional[int]] = mapped_column(ForeignKey("sifter_run.run_id"))
     # timestamp
     timestamp: Mapped[datetime] = mapped_column(primary_key=True)
     # liveness bitmask

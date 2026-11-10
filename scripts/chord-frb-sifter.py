@@ -36,9 +36,6 @@ class FrbSifter(frb_sifter_pb2_grpc.FrbSifterServicer):
         #self.dedisp_config = None
         #self.grouper_config = None
 
-        self.init_beam_snr_lock = threading.Lock()
-        self.init_beam_snr_queue = False
-
         self.subscribe_files_threads = []
         self.file_update_queue = queue.SimpleQueue()
         
@@ -72,8 +69,9 @@ class FrbSifter(frb_sifter_pb2_grpc.FrbSifterServicer):
         return utc
 
     def get_fpga0_nano(self):
-        t0 = self.xengine_config['unix_ns_at_seq_0']
-        return t0
+        if self.xengine_config is None:
+            return None
+        return self.xengine_config.get('unix_ns_at_seq_0', None)
 
     def nanosec_per_fpga_seq(self):
         dt = self.xengine_config['dt_ns_per_seq']
@@ -238,10 +236,7 @@ class FrbSifter(frb_sifter_pb2_grpc.FrbSifterServicer):
         # save parsed and yaml xengine config
         self.xengine_config = xengine
         self.xengine_config_yaml = xengine_yaml
-        with self.init_beam_snr_lock:
-            if not self.init_beam_snr_queue:
-                self.beam_snr_queue.put(None)
-                self.init_beam_snr_queue = True
+        self.beam_snr_queue.put(None)
         if not is_fake:
             self.pirate_config_yaml = pirate_yaml
             # dedisp? grouper?
@@ -307,17 +302,12 @@ class FrbSifter(frb_sifter_pb2_grpc.FrbSifterServicer):
 
         if not is_fake and len(request.coarsegrain_snr):
             # This is *almost* the only place where items are put onto the beam_snr_queue.
-            # See also "init_beam_snr_queue"
             # (only send once we've received the xengine config yaml)
-            ok = False
-            with self.init_beam_snr_lock:
-                ok = self.init_beam_snr_queue
-            if ok:
-                self.beam_snr_queue.put(dict(beamset=beamset,
-                                             fpga_start=request.chunk_fpga_start,
-                                             fpga_end=request.chunk_fpga_end,
-                                             beam_snr=request.coarsegrain_snr,
-                                             peer=peer))
+            self.beam_snr_queue.put(dict(beamset=beamset,
+                                         fpga_start=request.chunk_fpga_start,
+                                         fpga_end=request.chunk_fpga_end,
+                                         beam_snr=request.coarsegrain_snr,
+                                         peer=peer))
 
         return FrbEventsReply(ok=ok, message=msg)
 
@@ -473,36 +463,40 @@ def beam_snr_handler(sifter, beam_snr_queue, database):
     known_beamsets = set()
     pirate_configs = {}
 
-    # Wait for first message on the queue, which means that the xengine config has been received
-    print('Beam_snr_handler: waiting for startup message')
-    x = beam_snr_queue.get()
-    assert(x is None)
+    initialized = False
+
+    # Next time we should write out a Liveness entry
+    liveness_period = 10.
+    # should we operate in wall-clock time, or in FPGA counts??
+    # wall clock assumes things like that we keep up with the beam_snr_queue;
+    # that the different pirates send at nearly synchronized times, etc
+    next_liveness = time.monotonic() + liveness_period
+    liveness_bitmask = 0
 
     with Session(database) as session:
-        run = SifterRun(run_id=get_sifter_run_id(session),
-                        start_time = datetime.now(),
-                        fpga0_nano = sifter.get_fpga0_nano(),
-                        nano_per_fpga = sifter.nanosec_per_fpga_seq(),
-                        )
-        session.add(run)
-        session.flush()
-        session.commit()
-        sifter_run_id = run.run_id
-        print('Saved SifterRun id', sifter_run_id)
-
-        # Next time we should write out a Liveness entry
-        liveness_period = 10.
-        # should we operate in wall-clock time, or in FPGA counts??
-        # wall clock assumes things like that we keep up with the beam_snr_queue;
-        # that the different pirates send at nearly synchronized times, etc
-        next_liveness = time.monotonic() + liveness_period
-        liveness_bitmask = 0
-
         while True:
             try:
                 beam_snr = beam_snr_queue.get(block=False, timeout=liveness_period)
             except queue.Empty:
                 beam_snr = None
+
+            if not initialized:
+                fpga0_nano = sifter.get_fpga0_nano()
+                if fpga0_nano is None:
+                    # We haven't received the first message from a Pirate yet.
+                    continue
+                run = SifterRun(run_id=get_sifter_run_id(session),
+                                start_time = datetime.now(),
+                                fpga0_nano = fpga0_nano,
+                                nano_per_fpga = sifter.nanosec_per_fpga_seq(),
+                                )
+                session.add(run)
+                session.flush()
+                session.commit()
+                sifter_run_id = run.run_id
+                print('Saved SifterRun id', sifter_run_id)
+                initialized = True
+                next_liveness = time.monotonic() + liveness_period
 
             # Save a liveness sample?
             time_now = time.monotonic()
@@ -515,6 +509,7 @@ def beam_snr_handler(sifter, beam_snr_queue, database):
                 session.commit()
                 next_liveness += liveness_period
                 liveness_bitmask = 0
+
             if beam_snr is None:
                 continue
 
