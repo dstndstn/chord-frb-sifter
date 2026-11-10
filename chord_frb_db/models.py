@@ -6,6 +6,7 @@ from typing import List
 from typing import Optional
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from sqlalchemy import Table, Column, Integer, String, SmallInteger, BigInteger, Double, REAL, ForeignKey, Float, Boolean, DateTime, ARRAY
+from sqlalchemy.schema import Sequence
 
 import numpy as np
 
@@ -17,6 +18,10 @@ class Base(DeclarativeBase):
 #         int16   = SmallInteger
 #         int32   = Integer
 #         int64   = BigInteger
+
+event_id_sequence = Sequence('event_id_sequence', start=1, metadata=Base.metadata)
+def get_next_event_id(session):
+    return session.scalar(event_id_sequence)
 
 class Event(Base):
     __tablename__ = 'event'
@@ -202,6 +207,20 @@ class KnownSource(Base):
         return ('KnownSource: %s, %s, RA,Dec %.4f,%.4f, DM %.2f' %
                 (self.name, self.source_type, self.ra, self.dec, self.dm))
 
+sifter_run_id_sequence = Sequence('sifter_run_id_sequence', start=1, metadata=Base.metadata)
+def get_sifter_run_id(session):
+    return session.scalar(sifter_run_id_sequence)
+
+class SifterRun(Base):
+    __tablename__ = 'sifter_run'
+    run_id:  Mapped[int] = mapped_column(primary_key=True)
+    # start_time of the Sifter
+    start_time:  Mapped[datetime]
+    # fpga0_nano = xengine['unix_ns_at_seq_0']
+    fpga0_nano: Mapped[int] = mapped_column(BigInteger)
+    # nano_per_fpga = xengine['dt_ns_per_seq']
+    nano_per_fpga: Mapped[int]
+
 '''
 Populated by the sifter from info it receives in the first message from a Pirate
 instance.
@@ -209,10 +228,13 @@ instance.
 class PirateConfig(Base):
     __tablename__ = 'pirate_config'
     id:          Mapped[int] = mapped_column(primary_key=True)
+    #
+    sifter_run_id: Mapped[Optional[int]] = mapped_column(ForeignKey("sifter_run.run_id"))
+    #sifter_run:    Mapped['SifterRun'] = relationship(back_populates='pirates')
     # beamset
     beamset:     Mapped[int]
-    # start_time
-    start_time:  Mapped[datetime]
+    # first time we heard from this pirate
+    first_message_time:  Mapped[datetime]
     # xengine_config
     xengine_config: Mapped[str]  # = mapped_column(String(10240))
     # pirate_config
@@ -242,11 +264,12 @@ class BeamSNR(Base):
     # beam_snr
     beam_snr: Mapped[List[float]] = mapped_column(ARRAY(REAL, dimensions=1, zero_indexes=True))
 
-from sqlalchemy.schema import Sequence
-
-event_id_sequence = Sequence('event_id_sequence', start=1, metadata=Base.metadata)
-def get_next_event_id(session):
-    return session.scalar(event_id_sequence)
+class Liveness(Base):
+    __tablename__ = 'liveness'
+    # timestamp
+    timestamp: Mapped[datetime] = mapped_column(primary_key=True)
+    # liveness bitmask
+    liveness: Mapped[int] = mapped_column(nullable=False)
 
 if __name__ == '__main__':
     import os
