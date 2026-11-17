@@ -110,6 +110,11 @@ specifics:
         io: ['+ipc://Localizer_b', '+ipc://KnownSourceSifter_a']
         periodic_update: 1.0    # reload known sources database every hour
 
+    KnownSourceTagger:
+        threshold: 0.68          # float; threshold above which an event is
+                                 #        deemed to have a known source
+                                 #        association
+        periodic_update: 1.0    # reload known sources database every hour
 
     DMChecker:
         systematic_uncertainty_limit: 0.    # lower limit in DM systematic uncertainty.

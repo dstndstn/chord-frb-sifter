@@ -16,7 +16,7 @@ def simple_create_pipeline(database_engine, **kwargs):
     from chord_frb_sifter.actors.bright_pulsar_sifter import BrightPulsarSifter
     from chord_frb_sifter.actors.rfi_sifter import RFISifter
     from chord_frb_sifter.actors.dm_checker import DMChecker
-    #from chord_frb_sifter.actors.known_source import KnownSourceSifter
+    from chord_frb_sifter.actors.known_source import KnownSourceTagger
     from chord_frb_sifter.actors.actions import ActionPicker
     from chord_frb_sifter.actors.event_id_stamper import EventIdStamper
 
@@ -28,12 +28,13 @@ def simple_create_pipeline(database_engine, **kwargs):
                      ("BrightPulsarSifter", BrightPulsarSifter),
                      ('Localizer', Localizer), # Gauss2D localizer
                      #('Localizer', SimpleLocalizer), # S/N weighted
-                     #('KnownSourceSifter', KnownSourceSifter),
+                     ('KnownSourceTagger', KnownSourceTagger),
                      ('DMChecker', DMChecker),
                      # ('FluxEstimator', FluxEstimator),
                      ('ActionPicker', ActionPicker),
                      ]:
         conf = config.get_worker_configuration(name)
+        print('Config file', name, ':', conf)
         conf.update(database_engine=database_engine)
         conf.update(kwargs)
         p = clz(**conf)

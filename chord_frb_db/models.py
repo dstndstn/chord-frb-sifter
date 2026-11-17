@@ -190,6 +190,8 @@ class KnownSource(Base):
     # reference, etc - human readable
     origin:      Mapped[str] = mapped_column(String(32))
     ra:          Mapped[float] = mapped_column(REAL)
+    # NOTE, this should be in "isotropic" - ie, include a cos(Dec) scaling
+    # so that an error of 1 deg is the same uncertainty at any Dec.
     ra_error:    Mapped[Optional[float]] = mapped_column(REAL)
     dec:         Mapped[float] = mapped_column(REAL)
     dec_error:   Mapped[Optional[float]] = mapped_column(REAL)
@@ -205,6 +207,9 @@ class KnownSource(Base):
 
     def __str__(self):
         return ('KnownSource: %s, %s, RA,Dec %.4f,%.4f, DM %.2f' %
+                (self.name, self.source_type, self.ra, self.dec, self.dm))
+    def __repr__(self):
+        return ('KnownSource(%s, %s, RA,Dec %.4f,%.4f, DM %.2f)' %
                 (self.name, self.source_type, self.ra, self.dec, self.dm))
 
 sifter_run_id_sequence = Sequence('sifter_run_id_sequence', start=1, metadata=Base.metadata)
